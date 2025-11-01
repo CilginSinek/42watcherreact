@@ -10,11 +10,18 @@ interface Student {
   email: string;
   image: {
     link: string;
+    versions: {
+      large: string;
+      medium: string;
+      small: string;
+      micro: string;
+    };
   };
   correction_point: number;
   wallet: number;
   location: string | null;
   blackholed: boolean | null;
+  next_milestone: string | null;
   'active?': boolean;
   'alumni?': boolean;
   is_piscine: boolean;
@@ -88,7 +95,7 @@ function Home() {
   const getStatusBadge = (student: Student) => {
     if (student.blackholed) return <span className="badge blackhole">⚫ Blackhole</span>;
     if (student.is_piscine) return <span className="badge piscine">🏊 Piscine</span>;
-    if (student.is_trans) return <span className="badge transfer">🔄 Transfer</span>;
+    if (student.is_trans) return <span className="badge transfer">🔄 Transcender</span>;
     if (student['alumni?']) return <span className="badge alumni">🎓 Alumni</span>;
     if (student['active?']) return <span className="badge active">✅ Active</span>;
     return <span className="badge inactive">❌ Inactive</span>;
@@ -146,7 +153,7 @@ function Home() {
             <option value="active">Active</option>
             <option value="blackhole">Blackhole</option>
             <option value="piscine">Piscine</option>
-            <option value="transfer">Transfer</option>
+            <option value="transfer">Transcender</option>
             <option value="alumni">Alumni</option>
           </select>
 
@@ -182,7 +189,7 @@ function Home() {
                 className="student-card"
                 onClick={() => handleStudentClick(student)}
               >
-                <img src={student.image.link} alt={student.login} className="student-avatar" />
+                <img src={student.image.versions.medium} alt={student.login} className="student-avatar" />
                 <div className="student-info">
                   <h3>
                     <a 
@@ -199,6 +206,9 @@ function Home() {
                   <div className="student-stats">
                     <span>⭐ {student.correction_point}</span>
                     <span>💰 {student.wallet}₳</span>
+                    {student.next_milestone && (
+                      <span>🎯 {student.next_milestone}</span>
+                    )}
                   </div>
                   {student.location && (
                     <p className="location">📍 {student.location}</p>

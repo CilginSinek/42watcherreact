@@ -254,10 +254,12 @@
 
 .student-stats {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   margin-bottom: 0.5rem;
   font-weight: 600;
   color: #555;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .location {
