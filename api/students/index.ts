@@ -1,6 +1,96 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import connectDB from '../lib/mongodb.js';
-import { Student } from '../models/Student.js';
+import mongoose from 'mongoose';
+
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  throw new Error('Please define MONGODB_URI environment variable');
+}
+
+interface CachedConnection {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+}
+
+declare global {
+  var mongoose: CachedConnection | undefined;
+}
+
+const cached: CachedConnection = global.mongoose || { conn: null, promise: null };
+
+if (!global.mongoose) {
+  global.mongoose = cached;
+}
+
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+
+    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+      return mongoose;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+// Student Schema
+const studentSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  campusId: { type: Number, required: true, index: true },
+  email: String,
+  login: { type: String, required: true, unique: true, index: true },
+  first_name: String,
+  last_name: String,
+  usual_full_name: String,
+  usual_first_name: String,
+  url: String,
+  phone: String,
+  displayname: String,
+  kind: String,
+  image: {
+    link: String,
+    versions: {
+      large: String,
+      medium: String,
+      small: String,
+      micro: String
+    }
+  },
+  "staff?": Boolean,
+  correction_point: Number,
+  pool_month: String,
+  pool_year: String,
+  location: String,
+  wallet: Number,
+  anonymize_date: String,
+  data_erasure_date: String,
+  created_at: Date,
+  updated_at: Date,
+  alumnized_at: Date,
+  "alumni?": Boolean,
+  "active?": Boolean,
+  blackholed: { type: Boolean, default: null },
+  next_milestone: { type: String, default: null },
+  is_piscine: { type: Boolean, default: false },
+  is_trans: { type: Boolean, default: false }
+}, { timestamps: true });
+
+const Student = mongoose.models.Student || mongoose.model("Student", studentSchema);
 
 export default async function handler(
   req: VercelRequest,
