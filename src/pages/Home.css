@@ -467,6 +467,7 @@
   position: relative;
   font-weight: 300;
   line-height: 1;
+  outline: none;
 }
 
 .close-btn:hover {
@@ -477,6 +478,11 @@
 
 .close-btn:active {
   transform: scale(0.95);
+  outline: none;
+}
+
+.close-btn:focus {
+  outline: none;
 }
 
 .close-btn::before {
@@ -523,4 +529,62 @@
   display: block;
   font-size: 3rem;
   margin-bottom: 1rem;
+}
+
+/* Footer Styles */
+.footer {
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 1.5rem 2rem;
+  margin-top: 3rem;
+}
+
+.footer-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.footer a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.footer a:hover {
+  color: #764ba2;
+}
+
+.github-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.github-link:hover {
+  background: rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
+}
+
+.github-link svg {
+  transition: transform 0.2s;
+}
+
+.github-link:hover svg {
+  transform: scale(1.1);
 }
