@@ -219,25 +219,37 @@ function Home() {
             ))}
           </div>
 
-          <div className="pagination">
-            <button
-              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-              disabled={pagination.page === 1}
-              className="pagination-btn"
-            >
-              ← Previous
-            </button>
-            <span className="page-info">
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
-            <button
-              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              disabled={pagination.page >= pagination.totalPages}
-              className="pagination-btn"
-            >
-              Next →
-            </button>
-          </div>
+          {students.length === 0 && !loading && (
+            <div className="no-results">
+              <div className="no-results-icon">🔍</div>
+              <div className="no-results-text">Sonuç Bulunamadı</div>
+              <div className="no-results-subtext">
+                Arama kriterlerinize uygun öğrenci bulunamadı. Lütfen filtreleri değiştirip tekrar deneyin.
+              </div>
+            </div>
+          )}
+
+          {students.length > 0 && (
+            <div className="pagination">
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                disabled={pagination.page === 1}
+                className="pagination-btn"
+              >
+                ← Previous
+              </button>
+              <span className="page-info">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                disabled={pagination.page >= pagination.totalPages}
+                className="pagination-btn"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </>
       )}
 
