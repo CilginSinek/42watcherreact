@@ -92,6 +92,19 @@ const studentSchema = new mongoose.Schema({
 
 const Student = mongoose.models.Student || mongoose.model("Student", studentSchema);
 
+// Cheater Schema
+const cheaterSchema = new mongoose.Schema({
+  campusId: { type: Number, required: true, index: true },
+  login: { type: String, required: true, index: true },
+  project: { type: String, required: true },
+  score: { type: Number, required: true },
+  date: { type: String, required: true }
+}, { timestamps: true });
+
+cheaterSchema.index({ login: 1, project: 1, date: 1 }, { unique: true });
+
+const Cheater = mongoose.models.Cheater || mongoose.model("Cheater", cheaterSchema);
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -120,7 +133,8 @@ export default async function handler(
     // Query parametreleri
     const { 
       search, 
-      status, // 'all', 'active', 'blackhole', 'piscine', 'transfer', 'alumni'
+      status, // 'all', 'active', 'blackhole', 'piscine', 'transfer', 'alumni', 'cheaters'
+      campusId, // '49' (Istanbul), '50' (Kocaeli)
       sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at'
       order = 'asc', // 'asc', 'desc'
       limit = '100',
@@ -129,6 +143,11 @@ export default async function handler(
 
     // Filter oluştur
     const filter: Record<string, unknown> = {};
+
+    // Campus filter
+    if (campusId && typeof campusId === 'string') {
+      filter.campusId = parseInt(campusId);
+    }
 
     // Search filter (login, displayname, email)
     if (search && typeof search === 'string') {
@@ -160,6 +179,12 @@ export default async function handler(
         case 'alumni':
           filter['alumni?'] = true;
           break;
+        case 'cheaters': {
+          // Cheaters filter: Get distinct logins from Cheater collection
+          const cheaterLogins = await Cheater.distinct('login');
+          filter.login = { $in: cheaterLogins };
+          break;
+        }
       }
     }
 

@@ -48,6 +48,7 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [campusId, setCampusId] = useState('all');
   const [sortBy, setSortBy] = useState('login');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -68,7 +69,8 @@ function Home() {
         sortBy,
         order,
         ...(search && { search }),
-        ...(status !== 'all' && { status })
+        ...(status !== 'all' && { status }),
+        ...(campusId !== 'all' && { campusId })
       });
 
       const response = await axios.get(`/api/students?${params}`);
@@ -84,7 +86,7 @@ function Home() {
   useEffect(() => {
     fetchStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, sortBy, order, status]);
+  }, [pagination.page, sortBy, order, status, campusId]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +150,12 @@ function Home() {
         </form>
 
         <div className="filter-controls">
+          <select value={campusId} onChange={(e) => setCampusId(e.target.value)} className="filter-select">
+            <option value="all">All Campuses</option>
+            <option value="49">Istanbul</option>
+            <option value="50">Kocaeli</option>
+          </select>
+
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="filter-select">
             <option value="all">All Students</option>
             <option value="active">Active</option>
@@ -155,6 +163,7 @@ function Home() {
             <option value="piscine">Piscine</option>
             <option value="transfer">Transcender</option>
             <option value="alumni">Alumni</option>
+            <option value="cheaters">Cheaters</option>
           </select>
 
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="filter-select">
