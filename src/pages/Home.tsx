@@ -103,18 +103,10 @@ function Home() {
     return <span className="badge inactive">❌ Inactive</span>;
   };
 
-  const handleStudentClick = async (student: Student) => {
+  const handleStudentClick = (student: Student) => {
+    // Cheats are already included in student data from API
     setSelectedStudent(student);
     setShowModal(true);
-    
-    // Fetch cheats for this student
-    try {
-      const response = await axios.get(`/api/cheats?login=${student.login}`);
-      setSelectedStudent({ ...student, cheats: response.data.cheats });
-    } catch (error) {
-      console.error('Error fetching cheats:', error);
-      setSelectedStudent({ ...student, cheats: [] });
-    }
   };
 
   const closeModal = () => {

@@ -211,8 +211,29 @@ export default async function handler(
       Student.countDocuments(filter)
     ]);
 
+    // Fetch cheats for all students in one query
+    const studentLogins = students.map((s: { login: string }) => s.login);
+    const cheats = await Cheater.find({ login: { $in: studentLogins } })
+      .select('-__v')
+      .lean();
+
+    // Group cheats by login
+    const cheatsByLogin = cheats.reduce((acc: Record<string, unknown[]>, cheat: { login: string }) => {
+      if (!acc[cheat.login]) {
+        acc[cheat.login] = [];
+      }
+      acc[cheat.login].push(cheat);
+      return acc;
+    }, {});
+
+    // Add cheats to each student
+    const studentsWithCheats = students.map((student: { login: string }) => ({
+      ...student,
+      cheats: cheatsByLogin[student.login] || []
+    }));
+
     return res.status(200).json({
-      students,
+      students: studentsWithCheats,
       pagination: {
         total,
         page: pageNum,
