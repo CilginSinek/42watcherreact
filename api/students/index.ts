@@ -204,7 +204,9 @@ export default async function handler(
     // Sorting
     const sortOrder = order === 'desc' ? -1 : 1;
     const sort: { [key: string]: 1 | -1 } = {};
-    if (typeof sortBy === 'string') {
+    const isCheatCountSort = sortBy === 'cheat_count';
+    
+    if (typeof sortBy === 'string' && !isCheatCountSort) {
       sort[sortBy] = sortOrder as 1 | -1;
     }
 
@@ -213,25 +215,25 @@ export default async function handler(
     const pageNum = parseInt(page as string) || 1;
     const skip = (pageNum - 1) * limitNum;
 
-    // Fetch students
+    // Fetch students (without pagination if sorting by cheat_count)
     const [students, total] = await Promise.all([
       Student.find(filter)
-        .sort(sort)
-        .limit(limitNum)
-        .skip(skip)
+        .sort(isCheatCountSort ? {} : sort)
+        .limit(isCheatCountSort ? 0 : limitNum)
+        .skip(isCheatCountSort ? 0 : skip)
         .select('-__v')
         .lean(),
       Student.countDocuments(filter)
     ]);
 
     // Fetch cheats for all students in one query
-    const studentLogins = students.map((s: { login: string }) => s.login);
+    const studentLogins = students.map((s: any) => s.login);
     const cheats = await Cheater.find({ login: { $in: studentLogins } })
       .select('-__v')
       .lean();
 
     // Group cheats by login
-    const cheatsByLogin = cheats.reduce((acc: Record<string, unknown[]>, cheat: { login: string }) => {
+    const cheatsByLogin = cheats.reduce((acc: Record<string, any[]>, cheat: any) => {
       if (!acc[cheat.login]) {
         acc[cheat.login] = [];
       }
@@ -240,10 +242,20 @@ export default async function handler(
     }, {});
 
     // Add cheats to each student
-    const studentsWithCheats = students.map((student: { login: string }) => ({
+    let studentsWithCheats = students.map((student: any) => ({
       ...student,
-      cheats: cheatsByLogin[student.login] || []
+      cheats: cheatsByLogin[student.login] || [],
+      cheat_count: (cheatsByLogin[student.login] || []).length
     }));
+
+    // Sort by cheat count if needed
+    if (isCheatCountSort) {
+      studentsWithCheats.sort((a: any, b: any) => {
+        return sortOrder === 1 ? a.cheat_count - b.cheat_count : b.cheat_count - a.cheat_count;
+      });
+      // Apply pagination after sorting
+      studentsWithCheats = studentsWithCheats.slice(skip, skip + limitNum);
+    }
 
     return res.status(200).json({
       students: studentsWithCheats,

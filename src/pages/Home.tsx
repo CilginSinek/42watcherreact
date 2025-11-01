@@ -169,6 +169,7 @@ function Home() {
             <option value="correction_point">Correction Points</option>
             <option value="wallet">Wallet</option>
             <option value="created_at">Created Date</option>
+            <option value="cheat_count">Cheat Count</option>
           </select>
 
           <button 
@@ -218,6 +219,9 @@ function Home() {
                   <div className="student-stats">
                     <span>⭐ {student.correction_point}</span>
                     <span>💰 {student.wallet}₳</span>
+                    {student.cheats && student.cheats.length > 0 && (
+                      <span className="cheat-count">🚨 {student.cheats.length}</span>
+                    )}
                     {student.next_milestone && (
                       <span>🎯 {student.next_milestone}</span>
                     )}
@@ -278,7 +282,7 @@ function Home() {
                   {selectedStudent.displayname || selectedStudent.login}
                 </a>
               </h2>
-              <button className="close-btn" onClick={closeModal}>×</button>
+              <button className="close-btn" onClick={closeModal} aria-label="Close modal"></button>
             </div>
 
             {selectedStudent.cheats === undefined ? (
