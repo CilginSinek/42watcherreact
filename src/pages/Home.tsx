@@ -45,7 +45,7 @@ interface PaginationInfo {
 }
 
 function Home() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -75,7 +75,11 @@ function Home() {
         ...(campusId !== 'all' && { campusId })
       });
 
-      const response = await axios.get(`/api/students?${params}`);
+      const response = await axios.get(`/api/students?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setStudents(response.data.students);
       setPagination(response.data.pagination);
     } catch (error) {

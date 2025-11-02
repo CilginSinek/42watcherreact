@@ -122,7 +122,7 @@ export default async function handler(
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   );
 
   if (req.method === 'OPTIONS') {
@@ -132,6 +132,32 @@ export default async function handler(
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Authorization kontrolü
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization token required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  // Token'ı 42 API ile doğrula
+  try {
+    const verifyResponse = await fetch('https://api.intra.42.fr/v2/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!verifyResponse.ok) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return res.status(401).json({ error: 'Token verification failed' });
   }
 
   try {

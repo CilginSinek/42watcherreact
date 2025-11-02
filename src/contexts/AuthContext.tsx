@@ -17,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   login: () => void;
   logout: () => void;
+  token: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,12 +38,14 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is already logged in
-    const token = localStorage.getItem('42_access_token');
-    if (token) {
-      fetchUserData(token);
+    const storedToken = localStorage.getItem('42_access_token');
+    if (storedToken) {
+      setToken(storedToken);
+      fetchUserData(storedToken);
     } else {
       setLoading(false);
     }
@@ -76,11 +79,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const logout = () => {
     localStorage.removeItem('42_access_token');
     setUser(null);
+    setToken(null);
     window.location.href = '/';
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, token }}>
       {children}
     </AuthContext.Provider>
   );
