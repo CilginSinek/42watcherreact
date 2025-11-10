@@ -136,11 +136,18 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    if (token) {
+    if (token && !dashboardData) {
       fetchDashboardData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, campusId]);
+  }, [token]);
+
+  useEffect(() => {
+    if (token && dashboardData) {
+      fetchDashboardData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campusId]);
 
   const handleCardClick = (login: string) => {
     if (!data) return;
