@@ -49,6 +49,10 @@ interface Student {
   correction_point: number;
   wallet: number;
   grade: string | null;
+  projects?: Project[];
+  patronage?: Patronage | null;
+  has_cheats?: boolean;
+  cheat_count?: number;
 }
 
 interface TopSubmitter {
@@ -107,7 +111,6 @@ function Dashboard() {
   const [loading, setLoading] = useState(!dashboardData);
   const [selectedStudent, setSelectedStudent] = useState<StudentFull | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [loadingStudent, setLoadingStudent] = useState(false);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -127,33 +130,81 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    if (token) {
+    if (token && !dashboardData) {
       fetchDashboardData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const fetchStudentDetails = async (login: string) => {
-    setLoadingStudent(true);
-    try {
-      const response = await axios.get(`/api/students?search=${login}&limit=1`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.data.students && response.data.students.length > 0) {
-        setSelectedStudent(response.data.students[0]);
-        setShowModal(true);
-      }
-    } catch (error) {
-      console.error('Error fetching student details:', error);
-    } finally {
-      setLoadingStudent(false);
-    }
-  };
-
   const handleCardClick = (login: string) => {
-    fetchStudentDetails(login);
+    if (!data) return;
+    
+    // Dashboard verisinden student bilgisini bul
+    let studentData: Student | null = null;
+    
+    // Önce monthly stats'ta ara
+    const monthlySubmitter = data.topProjectSubmitters?.find(s => s.login === login);
+    if (monthlySubmitter?.student) {
+      studentData = monthlySubmitter.student;
+    }
+    
+    // Monthly location stats'ta ara
+    if (!studentData) {
+      const monthlyLocation = data.topLocationStats?.find(s => s.login === login);
+      if (monthlyLocation?.student) {
+        studentData = monthlyLocation.student;
+      }
+    }
+    
+    // All-time projects'te ara
+    if (!studentData) {
+      const allTimeProject = data.allTimeProjects?.find(s => s.login === login);
+      if (allTimeProject?.student) {
+        studentData = allTimeProject.student;
+      }
+    }
+    
+    // All-time wallet'ta ara
+    if (!studentData) {
+      const allTimeWalletItem = data.allTimeWallet?.find(s => s.login === login);
+      if (allTimeWalletItem?.student) {
+        studentData = allTimeWalletItem.student;
+      }
+    }
+    
+    // All-time points'te ara
+    if (!studentData) {
+      const allTimePointsItem = data.allTimePoints?.find(s => s.login === login);
+      if (allTimePointsItem?.student) {
+        studentData = allTimePointsItem.student;
+      }
+    }
+    
+    // All-time levels'ta ara
+    if (!studentData) {
+      const allTimeLevelsItem = data.allTimeLevels?.find(s => s.login === login);
+      if (allTimeLevelsItem?.student) {
+        studentData = allTimeLevelsItem.student;
+      }
+    }
+    
+    if (studentData) {
+      // Student tipini StudentFull'a dönüştür
+      setSelectedStudent({
+        ...studentData,
+        email: '', // Email gerekli değil modal'da ama interface için ekliyoruz
+        image: {
+          link: studentData.image.link,
+          versions: {
+            large: studentData.image.link,
+            medium: studentData.image.link,
+            small: studentData.image.link,
+            micro: studentData.image.link
+          }
+        }
+      } as StudentFull);
+      setShowModal(true);
+    }
   };
 
   const closeModal = () => {
@@ -474,9 +525,7 @@ function Dashboard() {
             )}
 
             {/* Projects Section */}
-            {loadingStudent ? (
-              <div className="loading">Loading...</div>
-            ) : selectedStudent.projects && selectedStudent.projects.length > 0 ? (
+            {selectedStudent.projects && selectedStudent.projects.length > 0 ? (
               <div className="project-sections">
                 {/* Cheating Records */}
                 {selectedStudent.has_cheats && selectedStudent.cheat_count && selectedStudent.cheat_count > 0 && (

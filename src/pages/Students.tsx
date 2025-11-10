@@ -77,6 +77,7 @@ function Students() {
       ? (studentsData as { pagination: PaginationInfo }).pagination 
       : { total: 0, page: 1, limit: 50, totalPages: 0 }
   );
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Debounce için
   const debounceTimeout = useRef<number | null>(null);
@@ -121,13 +122,19 @@ function Students() {
   }, [pagination.page, sortBy, order, status, campusId, search, token]);
 
   useEffect(() => {
+    // İlk yüklemede cache varsa fetch yapma
+    if (isInitialLoad && studentsData) {
+      setIsInitialLoad(false);
+      return;
+    }
+    
     debouncedFetch();
     return () => {
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
     };
-  }, [debouncedFetch]);
+  }, [debouncedFetch, isInitialLoad, studentsData]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
