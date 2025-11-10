@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose from 'mongoose';
-import { Student, Project, LocationStats } from '../models/Student';
+import { Student, Project, LocationStats } from '../models/Student.js';
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
