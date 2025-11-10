@@ -127,9 +127,16 @@
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 2rem;
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
+}
+
+.all-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  margin-top: 2rem;
 }
 
 .stats-section {
@@ -137,6 +144,12 @@
   border-radius: 16px;
   padding: 2rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s;
+}
+
+.stats-section:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
 }
 
 .section-title {
@@ -250,18 +263,23 @@
   margin: 0;
   font-size: 1.2rem;
   color: #333;
+  font-weight: 700;
 }
 
 .student-stats {
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .stat-item {
   font-size: 0.95rem;
-  color: #666;
+  color: #555;
   font-weight: 600;
+  background: rgba(102, 126, 234, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 8px;
 }
 
 .time-stat {
@@ -349,17 +367,230 @@
     grid-template-columns: 1fr;
   }
 
+  .all-time-grid {
+    grid-template-columns: 1fr;
+  }
+
   .month-title {
     font-size: 1.5rem;
   }
 
   .top-card {
-    flex-direction: column;
-    text-align: center;
+    padding: 1rem;
+  }
+
+  .student-avatar {
+    width: 50px;
+    height: 50px;
   }
 
   .student-stats,
   .student-extras {
-    justify-content: center;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1200px) {
+  .all-time-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 2.5rem;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  background: #dc2626;
+  transform: rotate(90deg);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.modal-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 4px solid #667eea;
+}
+
+.modal-student-info h2 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.8rem;
+}
+
+.modal-student-info p {
+  margin: 0.25rem 0;
+  color: #666;
+  font-size: 1rem;
+}
+
+.modal-student-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.modal-stat {
+  background: rgba(102, 126, 234, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.modal-section {
+  margin: 2rem 0;
+}
+
+.modal-section h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.patronage-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.patronage-list {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.patronage-list h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.patronage-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.patronage-list li {
+  padding: 0.5rem;
+  background: white;
+  margin-bottom: 0.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #555;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.project-card {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.project-card.cheater {
+  border-left-color: #ef4444;
+  background: #fef2f2;
+}
+
+.project-card h4 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.project-score {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #667eea;
+}
+
+.project-card.cheater .project-score {
+  color: #ef4444;
+}
+
+.project-date {
+  font-size: 0.85rem;
+  color: #999;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 1.5rem;
+  }
+
+  .modal-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .patronage-section {
+    grid-template-columns: 1fr;
+  }
+
+  .projects-grid {
+    grid-template-columns: 1fr;
   }
 }
