@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose from 'mongoose';
-import { Student, Project, LocationStats } from '../models/Student.js';
+import { Student, Project, LocationStats, Patronage } from '../models/Student.js';
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -47,6 +47,22 @@ async function connectDB() {
   }
 
   return cached.conn;
+}
+
+// Helper function to add patronage data to students
+async function addPatronageToStudents(students: Record<string, unknown>[]) {
+  const logins = students.map(s => s.login as string);
+  const patronageData = await Patronage.find({ login: { $in: logins } })
+    .select('login godfathers children')
+    .lean();
+  
+  return students.map(student => {
+    const patronage = patronageData.find((p: Record<string, unknown>) => p.login === student.login);
+    return {
+      ...student,
+      patronage: patronage || null
+    };
+  });
 }
 
 export default async function handler(
@@ -100,6 +116,14 @@ export default async function handler(
   try {
     await connectDB();
 
+    // Query parametrelerini al
+    const campusIdParam = req.query.campusId as string | undefined;
+    
+    // Campus filter oluştur
+    const campusFilter = campusIdParam && campusIdParam !== 'all' 
+      ? { campusId: parseInt(campusIdParam) } 
+      : {};
+
     // Tarih hesaplamaları
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -114,6 +138,7 @@ export default async function handler(
     const topProjectSubmitters = await Project.aggregate([
       {
         $match: {
+          ...campusFilter,
           date: {
             $gte: monthStart.toISOString().split('T')[0],
             $lte: monthEnd.toISOString().split('T')[0]
@@ -146,8 +171,11 @@ export default async function handler(
     // Top submitters için student bilgilerini al
     const topSubmittersLogins = topProjectSubmitters.map((s: { _id: string }) => s._id);
     const topSubmittersStudents = await Student.find({ login: { $in: topSubmittersLogins } })
-      .select('login displayname image correction_point wallet grade patronage has_cheats cheat_count')
+      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
       .lean();
+    
+    // Patronage bilgilerini ekle
+    const topSubmittersStudentsWithPatronage = await addPatronageToStudents(topSubmittersStudents);
     
     // Projects bilgilerini al
     const topSubmittersProjects = await Project.find({ login: { $in: topSubmittersLogins } })
@@ -157,7 +185,7 @@ export default async function handler(
 
     // Student bilgilerini merge et
     const topSubmitters = topProjectSubmitters.map((proj: Record<string, unknown>) => {
-      const student = topSubmittersStudents.find((s: Record<string, unknown>) => s.login === proj._id);
+      const student = topSubmittersStudentsWithPatronage.find((s: Record<string, unknown>) => s.login === proj._id);
       const projects = topSubmittersProjects.filter((p: Record<string, unknown>) => p.login === proj._id);
       return {
         login: proj._id,
@@ -173,6 +201,9 @@ export default async function handler(
 
     // Son 3 ay en çok kampüste kalanlar (location stats)
     const topLocationStats = await LocationStats.aggregate([
+      {
+        $match: campusFilter
+      },
       {
         $project: {
           login: 1,
@@ -255,8 +286,11 @@ export default async function handler(
     // Top location stats için student bilgilerini al
     const topLocationLogins = topLocationStats.map((s: { login: string }) => s.login);
     const topLocationStudents = await Student.find({ login: { $in: topLocationLogins } })
-      .select('login displayname image correction_point wallet grade patronage has_cheats cheat_count')
+      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
       .lean();
+    
+    // Patronage bilgilerini ekle
+    const topLocationStudentsWithPatronage = await addPatronageToStudents(topLocationStudents);
     
     // Projects bilgilerini al
     const topLocationProjects = await Project.find({ login: { $in: topLocationLogins } })
@@ -266,7 +300,7 @@ export default async function handler(
 
     // Student bilgilerini merge et
     const topLocations = topLocationStats.map((loc: Record<string, unknown>) => {
-      const student = topLocationStudents.find((s: Record<string, unknown>) => s.login === loc.login);
+      const student = topLocationStudentsWithPatronage.find((s: Record<string, unknown>) => s.login === loc.login);
       const projects = topLocationProjects.filter((p: Record<string, unknown>) => p.login === loc.login);
       return {
         login: loc.login,
@@ -284,6 +318,7 @@ export default async function handler(
     const allTimeProjects = await Project.aggregate([
       {
         $match: {
+          ...campusFilter,
           score: { $gt: 0 } // Sadece başarılı projeler
         }
       },
@@ -305,8 +340,11 @@ export default async function handler(
     // Tüm zamanlar en çok proje teslim edenler için student bilgileri
     const allTimeProjectsLogins = allTimeProjects.map((s: { _id: string }) => s._id);
     const allTimeProjectsStudents = await Student.find({ login: { $in: allTimeProjectsLogins } })
-      .select('login displayname image correction_point wallet grade patronage has_cheats cheat_count')
+      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
       .lean();
+    
+    // Patronage bilgilerini ekle
+    const allTimeProjectsStudentsWithPatronage = await addPatronageToStudents(allTimeProjectsStudents);
     
     // Projects bilgilerini al
     const allTimeProjectsProjectsList = await Project.find({ login: { $in: allTimeProjectsLogins } })
@@ -315,7 +353,7 @@ export default async function handler(
       .lean();
 
     const allTimeProjectsWithStudents = allTimeProjects.map((proj: Record<string, unknown>) => {
-      const student = allTimeProjectsStudents.find((s: Record<string, unknown>) => s.login === proj._id);
+      const student = allTimeProjectsStudentsWithPatronage.find((s: Record<string, unknown>) => s.login === proj._id);
       const projects = allTimeProjectsProjectsList.filter((p: Record<string, unknown>) => p.login === proj._id);
       return {
         login: proj._id,
@@ -329,11 +367,17 @@ export default async function handler(
     });
 
     // Tüm zamanlar en yüksek wallet
-    const allTimeWallet = await Student.find({ wallet: { $exists: true, $ne: null } })
-      .select('login displayname image correction_point wallet grade patronage has_cheats cheat_count')
+    const allTimeWallet = await Student.find({ 
+      ...campusFilter,
+      wallet: { $exists: true, $ne: null } 
+    })
+      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
       .sort({ wallet: -1 })
       .limit(5)
       .lean();
+    
+    // Patronage bilgilerini ekle
+    const allTimeWalletWithPatronage = await addPatronageToStudents(allTimeWallet);
     
     // Wallet için projects bilgilerini al
     const allTimeWalletLogins = allTimeWallet.map((s: Record<string, unknown>) => s.login as string);
@@ -342,7 +386,7 @@ export default async function handler(
       .sort({ date: -1 })
       .lean();
 
-    const allTimeWalletFormatted = allTimeWallet.map((student: Record<string, unknown>) => {
+    const allTimeWalletFormatted = allTimeWalletWithPatronage.map((student: Record<string, unknown>) => {
       const projects = allTimeWalletProjects.filter((p: Record<string, unknown>) => p.login === student.login);
       return {
         login: student.login,
@@ -355,11 +399,17 @@ export default async function handler(
     });
 
     // Tüm zamanlar en yüksek evaluation points
-    const allTimePoints = await Student.find({ correction_point: { $exists: true, $ne: null } })
-      .select('login displayname image correction_point wallet grade patronage has_cheats cheat_count')
+    const allTimePoints = await Student.find({ 
+      ...campusFilter,
+      correction_point: { $exists: true, $ne: null } 
+    })
+      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
       .sort({ correction_point: -1 })
       .limit(5)
       .lean();
+    
+    // Patronage bilgilerini ekle
+    const allTimePointsWithPatronage = await addPatronageToStudents(allTimePoints);
     
     // Points için projects bilgilerini al
     const allTimePointsLogins = allTimePoints.map((s: Record<string, unknown>) => s.login as string);
@@ -368,7 +418,7 @@ export default async function handler(
       .sort({ date: -1 })
       .lean();
 
-    const allTimePointsFormatted = allTimePoints.map((student: Record<string, unknown>) => {
+    const allTimePointsFormatted = allTimePointsWithPatronage.map((student: Record<string, unknown>) => {
       const projects = allTimePointsProjects.filter((p: Record<string, unknown>) => p.login === student.login);
       return {
         login: student.login,
@@ -381,11 +431,17 @@ export default async function handler(
     });
 
     // Tüm zamanlar en yüksek level
-    const allTimeLevels = await Student.find({ level: { $exists: true, $ne: null } })
-      .select('login displayname image correction_point wallet grade level patronage has_cheats cheat_count')
+    const allTimeLevels = await Student.find({ 
+      ...campusFilter,
+      level: { $exists: true, $ne: null } 
+    })
+      .select('login displayname image correction_point wallet grade level has_cheats cheat_count')
       .sort({ level: -1 })
       .limit(5)
       .lean();
+    
+    // Patronage bilgilerini ekle
+    const allTimeLevelsWithPatronage = await addPatronageToStudents(allTimeLevels);
     
     // Levels için projects bilgilerini al
     const allTimeLevelsLogins = allTimeLevels.map((s: Record<string, unknown>) => s.login as string);
@@ -394,7 +450,7 @@ export default async function handler(
       .sort({ date: -1 })
       .lean();
 
-    const allTimeLevelsFormatted = allTimeLevels.map((student: Record<string, unknown>) => {
+    const allTimeLevelsFormatted = allTimeLevelsWithPatronage.map((student: Record<string, unknown>) => {
       const projects = allTimeLevelsProjects.filter((p: Record<string, unknown>) => p.login === student.login);
       return {
         login: student.login,

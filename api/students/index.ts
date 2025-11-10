@@ -105,6 +105,7 @@ export default async function handler(
       search, 
       status, // 'all', 'active', 'blackhole', 'piscine', 'transfer', 'alumni', 'cheaters'
       campusId, // '49' (Istanbul), '50' (Kocaeli)
+      grade, // 'all', 'staff', 'test'
       sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at', 'cheat_count', 'project_count', 'log_time'
       order = 'asc', // 'asc', 'desc'
       limit = '100',
@@ -117,6 +118,16 @@ export default async function handler(
     // Campus filter
     if (campusId && typeof campusId === 'string') {
       filter.campusId = parseInt(campusId);
+    }
+
+    // Grade filter
+    if (grade && typeof grade === 'string') {
+      if (grade === 'staff') {
+        filter['staff?'] = true;
+      } else if (grade === 'test') {
+        filter.is_test = true;
+      }
+      // 'all' ise filter ekleme
     }
 
     // Search filter (login, displayname, email)

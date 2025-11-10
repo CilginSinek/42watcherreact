@@ -68,6 +68,7 @@ function Students() {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [status, setStatus] = useState('all');
   const [campusId, setCampusId] = useState('all');
+  const [grade, setGrade] = useState('all');
   const [sortBy, setSortBy] = useState('login');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -89,7 +90,8 @@ function Students() {
         order,
         ...(search && { search }),
         ...(status !== 'all' && { status }),
-        ...(campusId !== 'all' && { campusId })
+        ...(campusId !== 'all' && { campusId }),
+        ...(grade !== 'all' && { grade })
       });
 
       const response = await axios.get(`/api/students?${params}`, {
@@ -120,7 +122,7 @@ function Students() {
     // Sadece filter/sort/pagination değişikliklerinde fetch at (search hariç)
     fetchStudents();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, sortBy, order, status, campusId, token]);
+  }, [pagination.page, sortBy, order, status, campusId, grade, token]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,6 +224,12 @@ function Students() {
               <option value="sinker">Sinker</option>
               <option value="freeze">Freeze</option>
               <option value="cheaters">Cheaters</option>
+            </select>
+
+            <select value={grade} onChange={(e) => handleFilterChange(setGrade, e.target.value)} className="filter-select">
+              <option value="all">All Types</option>
+              <option value="staff">Staff</option>
+              <option value="test">Test Accounts</option>
             </select>
 
             <select value={sortBy} onChange={(e) => handleFilterChange(setSortBy, e.target.value)} className="filter-select">

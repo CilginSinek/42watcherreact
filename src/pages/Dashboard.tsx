@@ -111,11 +111,17 @@ function Dashboard() {
   const [loading, setLoading] = useState(!dashboardData);
   const [selectedStudent, setSelectedStudent] = useState<StudentFull | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [campusId, setCampusId] = useState('all');
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/dashboard', {
+      const params = new URLSearchParams();
+      if (campusId !== 'all') {
+        params.append('campusId', campusId);
+      }
+      
+      const response = await axios.get(`/api/dashboard?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -130,11 +136,11 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    if (token && !dashboardData) {
+    if (token) {
       fetchDashboardData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, campusId]);
 
   const handleCardClick = (login: string) => {
     if (!data) return;
@@ -227,6 +233,17 @@ function Dashboard() {
             <Link to="/dashboard" className="nav-link active">Dashboard</Link>
             <Link to="/students" className="nav-link">Students</Link>
           </nav>
+          <div className="filter-container">
+            <select 
+              value={campusId} 
+              onChange={(e) => setCampusId(e.target.value)}
+              className="campus-filter"
+            >
+              <option value="all">All Campuses</option>
+              <option value="55">Kocaeli</option>
+              <option value="53">Istanbul</option>
+            </select>
+          </div>
           {user && (
             <div className="user-info">
               <img src={user.image.link} alt={user.login} />
@@ -273,15 +290,6 @@ function Dashboard() {
                             ⭐ {submitter.totalScore} total score
                           </span>
                         </div>
-                        {submitter.student && (
-                          <div className="student-extras">
-                            {submitter.student.grade && (
-                              <span className="grade-badge">{submitter.student.grade}</span>
-                            )}
-                            <span className="points">🎯 {submitter.student.correction_point}</span>
-                            <span className="wallet">💰 {submitter.student.wallet}₳</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}
@@ -313,15 +321,6 @@ function Dashboard() {
                             ⏰ {formatDuration(location.totalDuration)}
                           </span>
                         </div>
-                        {location.student && (
-                          <div className="student-extras">
-                            {location.student.grade && (
-                              <span className="grade-badge">{location.student.grade}</span>
-                            )}
-                            <span className="points">🎯 {location.student.correction_point}</span>
-                            <span className="wallet">💰 {location.student.wallet}₳</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}
