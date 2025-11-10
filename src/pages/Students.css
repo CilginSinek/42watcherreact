@@ -208,14 +208,31 @@
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.filter-select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1.2rem;
+  padding-right: 2.5rem;
 }
 
 .filter-select:hover,
 .order-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  background: white;
-  border-color: rgba(255, 255, 255, 0.5);
+  background-color: white;
+  border-color: #667eea;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
 }
 
 .stats {
@@ -744,6 +761,13 @@
   min-height: 120px;
 }
 
+.patronage-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
 .patronage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -781,6 +805,12 @@
   min-height: 36px;
 }
 
+.no-data {
+  color: #999;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
 .login-badge {
   display: inline-flex;
   align-items: center;
@@ -799,6 +829,12 @@
   background: linear-gradient(135deg, #5568d3 0%, #653a8a 100%);
   transform: translateY(-3px);
   box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+}
+
+@media (max-width: 768px) {
+  .patronage-grid-two {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Project Sections */
@@ -825,6 +861,22 @@
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
+  border-left: 4px solid transparent;
+}
+
+.project-item.status-success {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-left-color: #10b981;
+}
+
+.project-item.status-fail {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-left-color: #ef4444;
+}
+
+.project-item.status-in_progress {
+  background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+  border-left-color: #f59e0b;
 }
 
 .project-item:hover {
@@ -844,6 +896,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
+  flex-wrap: wrap;
 }
 
 .score {
@@ -869,6 +922,29 @@
 
 .date {
   color: #666;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.status-success {
+  background: #10b981;
+  color: white;
+}
+
+.status-badge.status-fail {
+  background: #ef4444;
+  color: white;
+}
+
+.status-badge.status-in_progress {
+  background: #f59e0b;
+  color: white;
 }
 
 .more-projects {

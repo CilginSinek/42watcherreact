@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
@@ -75,6 +75,9 @@ function Students() {
     totalPages: 0
   });
 
+  // Debounce için
+  const debounceTimeout = useRef<number | null>(null);
+
   const fetchStudents = async () => {
     setLoading(true);
     try {
@@ -102,10 +105,25 @@ function Students() {
     }
   };
 
+  // Debounced search
+  const debouncedFetch = useCallback(() => {
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
+    }
+    debounceTimeout.current = setTimeout(() => {
+      fetchStudents();
+    }, 500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, sortBy, order, status, campusId, search, token]);
+
   useEffect(() => {
-    fetchStudents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, sortBy, order, status, campusId, search]);
+    debouncedFetch();
+    return () => {
+      if (debounceTimeout.current) {
+        clearTimeout(debounceTimeout.current);
+      }
+    };
+  }, [debouncedFetch]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,9 +168,9 @@ function Students() {
       <div className="home-content">
         <header className="home-header">
           <div className="header-content">
-            <h1><a href="/" className="header-link">42 Watcher</a></h1>
+            <h1><a href="/dashboard" className="header-link">42 Watcher</a></h1>
             <nav className="nav-links">
-              <a href="/" className="nav-link">Dashboard</a>
+              <a href="/dashboard" className="nav-link">Dashboard</a>
               <a href="/students" className="nav-link active">Students</a>
             </nav>
             {user && (
@@ -348,12 +366,12 @@ function Students() {
                 <h3 style={{ color: '#667eea', marginBottom: '1rem' }}>
                   👥 Patronage
                 </h3>
-                <div className="patronage-grid">
-                  {selectedStudent.patronage.godfathers && selectedStudent.patronage.godfathers.length > 0 && (
-                    <div className="patronage-box">
-                      <h4>🎓 Godfathers ({selectedStudent.patronage.godfathers.length})</h4>
-                      <div className="login-list">
-                        {selectedStudent.patronage.godfathers.map((gf, idx) => (
+                <div className="patronage-grid-two">
+                  <div className="patronage-box">
+                    <h4>🎓 Godfathers ({selectedStudent.patronage.godfathers?.length || 0})</h4>
+                    <div className="login-list">
+                      {selectedStudent.patronage.godfathers && selectedStudent.patronage.godfathers.length > 0 ? (
+                        selectedStudent.patronage.godfathers.map((gf, idx) => (
                           <a
                             key={idx}
                             href={`https://profile.intra.42.fr/users/${gf.login}`}
@@ -363,15 +381,17 @@ function Students() {
                           >
                             @{gf.login}
                           </a>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <span className="no-data">No godfathers</span>
+                      )}
                     </div>
-                  )}
-                  {selectedStudent.patronage.children && selectedStudent.patronage.children.length > 0 && (
-                    <div className="patronage-box">
-                      <h4>👶 Children ({selectedStudent.patronage.children.length})</h4>
-                      <div className="login-list">
-                        {selectedStudent.patronage.children.map((child, idx) => (
+                  </div>
+                  <div className="patronage-box">
+                    <h4>👶 Children ({selectedStudent.patronage.children?.length || 0})</h4>
+                    <div className="login-list">
+                      {selectedStudent.patronage.children && selectedStudent.patronage.children.length > 0 ? (
+                        selectedStudent.patronage.children.map((child, idx) => (
                           <a
                             key={idx}
                             href={`https://profile.intra.42.fr/users/${child.login}`}
@@ -381,10 +401,12 @@ function Students() {
                           >
                             @{child.login}
                           </a>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <span className="no-data">No children</span>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -428,7 +450,7 @@ function Students() {
                         .filter((p) => p.status === 'success')
                         .slice(0, 10)
                         .map((project, index) => (
-                          <div key={index} className="project-item">
+                          <div key={index} className={`project-item status-${project.status}`}>
                             <h4>{project.project}</h4>
                             <div className="project-details">
                               <span className={`score ${project.score >= 80 ? 'high' : project.score >= 50 ? 'mid' : 'low'}`}>
@@ -436,6 +458,9 @@ function Students() {
                               </span>
                               <span className="date">
                                 📅 {new Date(project.date).toLocaleDateString()}
+                              </span>
+                              <span className={`status-badge status-${project.status}`}>
+                                {project.status}
                               </span>
                             </div>
                           </div>

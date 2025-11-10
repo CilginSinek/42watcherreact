@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
@@ -11,8 +11,9 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/callback" element={<Callback />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
