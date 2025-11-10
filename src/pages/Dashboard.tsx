@@ -8,6 +8,7 @@ interface Project {
   project: string;
   score: number;
   date: string;
+  status: 'success' | 'fail' | 'in_progress';
 }
 
 interface Patronage {
@@ -160,7 +161,7 @@ function Dashboard() {
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
-          <h1><Link to="/" className="header-link">42 Watcher</Link></h1>
+          <h1><a href="/" className="header-link">42 Watcher</a></h1>
           <nav className="nav-links">
             <Link to="/" className="nav-link active">Dashboard</Link>
             <Link to="/students" className="nav-link">Students</Link>
@@ -441,26 +442,27 @@ function Dashboard() {
                       ⚠️ Cheating Records ({selectedStudent.cheat_count})
                     </h3>
                     {selectedStudent.projects
-                      .filter((p) => p.score === -42)
+                      .filter((p) => p.score === -42 && p.status === 'fail')
                       .map((cheat, index) => (
                         <div key={index} className="cheat-item">
                           <h4>{cheat.project}</h4>
                           <p><strong>Score:</strong> {cheat.score}</p>
+                          <p><strong>Status:</strong> {cheat.status}</p>
                           <p><strong>Date:</strong> {new Date(cheat.date).toLocaleDateString()}</p>
                         </div>
                       ))}
                   </div>
                 )}
 
-                {/* Regular Projects */}
-                {selectedStudent.projects.filter((p) => p.score !== -42).length > 0 && (
+                {/* Regular Projects - Sadece başarılı olanlar */}
+                {selectedStudent.projects.filter((p) => p.status === 'success').length > 0 && (
                   <div className="project-list">
                     <h3 style={{ color: '#667eea', marginBottom: '1rem' }}>
-                      📦 Projects ({selectedStudent.projects.filter((p) => p.score !== -42).length})
+                      📦 Completed Projects ({selectedStudent.projects.filter((p) => p.status === 'success').length})
                     </h3>
                     <div className="project-grid">
                       {selectedStudent.projects
-                        .filter((p) => p.score !== -42)
+                        .filter((p) => p.status === 'success')
                         .slice(0, 10)
                         .map((project, index) => (
                           <div key={index} className="project-item">

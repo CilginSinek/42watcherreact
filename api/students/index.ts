@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose from 'mongoose';
-import { Student, Project, Patronage } from '../models/Student.js';
+import { Student, Project, Patronage, LocationStats } from '../models/Student.js';
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -105,7 +105,7 @@ export default async function handler(
       search, 
       status, // 'all', 'active', 'blackhole', 'piscine', 'transfer', 'alumni', 'cheaters'
       campusId, // '49' (Istanbul), '50' (Kocaeli)
-      sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at'
+      sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at', 'cheat_count', 'project_count', 'log_time'
       order = 'asc', // 'asc', 'desc'
       limit = '100',
       page = '1'
@@ -156,8 +156,11 @@ export default async function handler(
           filter.freeze = true;
           break;
         case 'cheaters': {
-          // Cheaters filter: Students with projects having score -42
-          const cheaterLogins = await Project.distinct('login', { score: -42 });
+          // Cheaters filter: Students with projects having status 'fail' and score -42
+          const cheaterLogins = await Project.distinct('login', { 
+            status: 'fail',
+            score: -42 
+          });
           filter.login = { $in: cheaterLogins };
           break;
         }
@@ -168,8 +171,11 @@ export default async function handler(
     const sortOrder = order === 'desc' ? -1 : 1;
     const sort: { [key: string]: 1 | -1 } = {};
     const isCheatCountSort = sortBy === 'cheat_count';
+    const isProjectCountSort = sortBy === 'project_count';
+    const isLogTimeSort = sortBy === 'log_time';
+    const needsCustomSort = isCheatCountSort || isProjectCountSort || isLogTimeSort;
     
-    if (typeof sortBy === 'string' && !isCheatCountSort) {
+    if (typeof sortBy === 'string' && !needsCustomSort) {
       sort[sortBy] = sortOrder as 1 | -1;
     }
 
@@ -178,12 +184,12 @@ export default async function handler(
     const pageNum = parseInt(page as string) || 1;
     const skip = (pageNum - 1) * limitNum;
 
-    // Fetch students (without pagination if sorting by cheat_count)
+    // Fetch students (without pagination if custom sorting)
     const [students, total] = await Promise.all([
       Student.find(filter)
-        .sort(isCheatCountSort ? {} : sort)
-        .limit(isCheatCountSort ? 0 : limitNum)
-        .skip(isCheatCountSort ? 0 : skip)
+        .sort(needsCustomSort ? {} : sort)
+        .limit(needsCustomSort ? 0 : limitNum)
+        .skip(needsCustomSort ? 0 : skip)
         .select('-__v')
         .lean(),
       Student.countDocuments(filter)
@@ -191,14 +197,18 @@ export default async function handler(
 
     // Fetch projects for all students in one query
     const studentLogins = students.map((s: Record<string, unknown>) => s.login as string);
-    const projects = await Project.find({ login: { $in: studentLogins } })
-      .select('-__v')
-      .lean();
-
-    // Fetch patronage data for all students
-    const patronages = await Patronage.find({ login: { $in: studentLogins } })
-      .select('-__v')
-      .lean();
+    
+    const [projects, patronages, locationStats] = await Promise.all([
+      Project.find({ login: { $in: studentLogins } })
+        .select('-__v')
+        .lean(),
+      Patronage.find({ login: { $in: studentLogins } })
+        .select('-__v')
+        .lean(),
+      LocationStats.find({ login: { $in: studentLogins } })
+        .select('-__v')
+        .lean()
+    ]);
 
     // Group projects by login
     const projectsByLogin = projects.reduce((acc: Record<string, Record<string, unknown>[]>, project: Record<string, unknown>) => {
@@ -217,27 +227,70 @@ export default async function handler(
       return acc;
     }, {});
 
+    // Group location stats by login and calculate total duration
+    const locationStatsByLogin = locationStats.reduce((acc: Record<string, { totalDuration: number }>, loc: Record<string, unknown>) => {
+      const login = loc.login as string;
+      const months = loc.months as Map<string, { totalDuration: string }>;
+      
+      // Calculate total duration from all months
+      let totalSeconds = 0;
+      if (months) {
+        Object.values(months).forEach((month: { totalDuration: string }) => {
+          if (month && month.totalDuration) {
+            const [hours, minutes, seconds] = month.totalDuration.split(':').map(Number);
+            totalSeconds += hours * 3600 + minutes * 60 + seconds;
+          }
+        });
+      }
+      
+      acc[login] = { totalDuration: totalSeconds };
+      return acc;
+    }, {});
+
     // Add projects and patronage to each student
     let studentsWithData = students.map((student: Record<string, unknown>) => {
       const studentProjects = projectsByLogin[student.login as string] || [];
-      const hasCheats = studentProjects.some((p: Record<string, unknown>) => p.score === -42);
+      // Cheat count: sadece status 'fail' ve score -42 olanlar
+      const cheats = studentProjects.filter((p: Record<string, unknown>) => 
+        p.status === 'fail' && p.score === -42
+      );
+      const hasCheats = cheats.length > 0;
+      // Sadece success olan projeleri say
+      const successProjects = studentProjects.filter((p: Record<string, unknown>) => 
+        p.status === 'success'
+      );
+      const locationData = locationStatsByLogin[student.login as string];
       
       return {
         ...student,
         projects: studentProjects,
-        project_count: studentProjects.length,
+        project_count: successProjects.length, // Sadece başarılı projeler
         has_cheats: hasCheats,
-        cheat_count: studentProjects.filter((p: Record<string, unknown>) => p.score === -42).length,
-        patronage: patronageByLogin[student.login as string] || null
+        cheat_count: cheats.length,
+        patronage: patronageByLogin[student.login as string] || null,
+        log_time: locationData ? locationData.totalDuration : 0
       };
     });
 
-    // Sort by cheat count if needed
-    if (isCheatCountSort) {
+    // Sort by custom fields if needed
+    if (needsCustomSort) {
       studentsWithData.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-        const aCount = a.cheat_count as number;
-        const bCount = b.cheat_count as number;
-        return sortOrder === 1 ? aCount - bCount : bCount - aCount;
+        let aValue, bValue;
+        
+        if (isCheatCountSort) {
+          aValue = a.cheat_count as number;
+          bValue = b.cheat_count as number;
+        } else if (isProjectCountSort) {
+          aValue = a.project_count as number;
+          bValue = b.project_count as number;
+        } else if (isLogTimeSort) {
+          aValue = a.log_time as number;
+          bValue = b.log_time as number;
+        } else {
+          return 0;
+        }
+        
+        return sortOrder === 1 ? aValue - bValue : bValue - aValue;
       });
       // Apply pagination after sorting
       studentsWithData = studentsWithData.slice(skip, skip + limitNum);

@@ -167,47 +167,92 @@ export default async function handler(
         $project: {
           login: 1,
           campusId: 1,
-          months: { $objectToArray: '$months' }
+          monthsArray: { $objectToArray: '$months' }
         }
       },
       {
-        $unwind: '$months'
+        $unwind: '$monthsArray'
       },
       {
         $match: {
-          'months.k': { $gte: threeMonthsAgoStr }
+          'monthsArray.k': { $gte: threeMonthsAgoStr }
+        }
+      },
+      {
+        $addFields: {
+          // totalDuration'ı string'den saniyeye çevir (HH:MM:SS formatı)
+          durationParts: { $split: ['$monthsArray.v.totalDuration', ':'] },
+        }
+      },
+      {
+        $addFields: {
+          durationSeconds: {
+            $add: [
+              { $multiply: [{ $toInt: { $arrayElemAt: ['$durationParts', 0] } }, 3600] }, // hours
+              { $multiply: [{ $toInt: { $arrayElemAt: ['$durationParts', 1] } }, 60] },   // minutes
+              { $toInt: { $arrayElemAt: ['$durationParts', 2] } }                         // seconds
+            ]
+          }
         }
       },
       {
         $group: {
           _id: '$login',
-          totalDuration: { $sum: '$months.v.totalDuration' }
+          totalDurationSeconds: { $sum: '$durationSeconds' }
         }
       },
       {
         $match: {
-          totalDuration: { $exists: true, $ne: null, $gt: 0 }
+          totalDurationSeconds: { $exists: true, $ne: null, $gt: 0 }
         }
       },
       {
-        $sort: { totalDuration: -1 }
+        $sort: { totalDurationSeconds: -1 }
       },
       {
         $limit: 5
+      },
+      {
+        $addFields: {
+          // Saniyeyi HH:MM:SS formatına geri çevir
+          hours: { $floor: { $divide: ['$totalDurationSeconds', 3600] } },
+          remainingSeconds: { $mod: ['$totalDurationSeconds', 3600] },
+        }
+      },
+      {
+        $addFields: {
+          minutes: { $floor: { $divide: ['$remainingSeconds', 60] } },
+          seconds: { $mod: ['$remainingSeconds', 60] }
+        }
+      },
+      {
+        $project: {
+          login: '$_id',
+          totalDuration: {
+            $concat: [
+              { $cond: [{ $lt: ['$hours', 10] }, { $concat: ['0', { $toString: '$hours' }] }, { $toString: '$hours' }] },
+              ':',
+              { $cond: [{ $lt: ['$minutes', 10] }, { $concat: ['0', { $toString: '$minutes' }] }, { $toString: '$minutes' }] },
+              ':',
+              { $cond: [{ $lt: ['$seconds', 10] }, { $concat: ['0', { $toString: '$seconds' }] }, { $toString: '$seconds' }] }
+            ]
+          },
+          totalDurationSeconds: 1
+        }
       }
     ]);
 
     // Top location stats için student bilgilerini al
-    const topLocationLogins = topLocationStats.map((s: { _id: string }) => s._id);
+    const topLocationLogins = topLocationStats.map((s: { login: string }) => s.login);
     const topLocationStudents = await Student.find({ login: { $in: topLocationLogins } })
       .select('login displayname image correction_point wallet grade')
       .lean();
 
     // Student bilgilerini merge et
     const topLocations = topLocationStats.map((loc: Record<string, unknown>) => {
-      const student = topLocationStudents.find((s: Record<string, unknown>) => s.login === loc._id);
+      const student = topLocationStudents.find((s: Record<string, unknown>) => s.login === loc.login);
       return {
-        login: loc._id,
+        login: loc.login,
         totalDuration: loc.totalDuration,
         student: student || null
       };
