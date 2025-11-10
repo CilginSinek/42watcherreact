@@ -50,6 +50,8 @@ interface Student {
   has_cheats?: boolean;
   cheat_count?: number;
   patronage?: Patronage | null;
+  godfather_count?: number;
+  children_count?: number;
 }
 
 interface PaginationInfo {
@@ -238,6 +240,8 @@ function Students() {
               <option value="cheat_count">Cheat Count</option>
               <option value="project_count">Project Count</option>
               <option value="log_time">Log Time</option>
+              <option value="godfather_count">Godfather Count</option>
+              <option value="children_count">Children Count</option>
             </select>
 
             <button 

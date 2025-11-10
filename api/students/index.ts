@@ -105,7 +105,7 @@ export default async function handler(
       search, 
       status, // 'all', 'active', 'blackhole', 'piscine', 'transfer', 'alumni', 'cheaters', 'staff', 'test'
       campusId, // '49' (Istanbul), '50' (Kocaeli)
-      sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at', 'cheat_count', 'project_count', 'log_time'
+      sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at', 'cheat_count', 'project_count', 'log_time', 'godfather_count', 'children_count'
       order = 'asc', // 'asc', 'desc'
       limit = '100',
       page = '1'
@@ -179,7 +179,9 @@ export default async function handler(
     const isCheatCountSort = sortBy === 'cheat_count';
     const isProjectCountSort = sortBy === 'project_count';
     const isLogTimeSort = sortBy === 'log_time';
-    const needsCustomSort = isCheatCountSort || isProjectCountSort || isLogTimeSort;
+    const isGodfatherCountSort = sortBy === 'godfather_count';
+    const isChildrenCountSort = sortBy === 'children_count';
+    const needsCustomSort = isCheatCountSort || isProjectCountSort || isLogTimeSort || isGodfatherCountSort || isChildrenCountSort;
     
     if (typeof sortBy === 'string' && !needsCustomSort) {
       sort[sortBy] = sortOrder as 1 | -1;
@@ -266,6 +268,7 @@ export default async function handler(
         p.status === 'success'
       );
       const locationData = locationStatsByLogin[student.login as string];
+      const patronage = patronageByLogin[student.login as string];
       
       return {
         ...student,
@@ -273,7 +276,9 @@ export default async function handler(
         project_count: successProjects.length, // Sadece başarılı projeler
         has_cheats: hasCheats,
         cheat_count: cheats.length,
-        patronage: patronageByLogin[student.login as string] || null,
+        patronage: patronage || null,
+        godfather_count: patronage?.godfathers ? (patronage.godfathers as unknown[]).length : 0,
+        children_count: patronage?.children ? (patronage.children as unknown[]).length : 0,
         log_time: locationData ? locationData.totalDuration : 0
       };
     });
@@ -292,6 +297,12 @@ export default async function handler(
         } else if (isLogTimeSort) {
           aValue = a.log_time as number;
           bValue = b.log_time as number;
+        } else if (isGodfatherCountSort) {
+          aValue = a.godfather_count as number;
+          bValue = b.godfather_count as number;
+        } else if (isChildrenCountSort) {
+          aValue = a.children_count as number;
+          bValue = b.children_count as number;
         } else {
           return 0;
         }
