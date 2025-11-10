@@ -49,22 +49,6 @@ async function connectDB() {
   return cached.conn;
 }
 
-// Helper function to add patronage data to students
-async function addPatronageToStudents(students: Record<string, unknown>[]) {
-  const logins = students.map(s => s.login as string);
-  const patronageData = await Patronage.find({ login: { $in: logins } })
-    .select('login godfathers children')
-    .lean();
-  
-  return students.map(student => {
-    const patronage = patronageData.find((p: Record<string, unknown>) => p.login === student.login);
-    return {
-      ...student,
-      patronage: patronage || null
-    };
-  });
-}
-
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -134,73 +118,51 @@ export default async function handler(
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
     const threeMonthsAgoStr = `${threeMonthsAgo.getFullYear()}-${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}`;
 
-    // Bu ay en çok proje teslim edenler (score > 0 olanlar)
-    const topProjectSubmitters = await Project.aggregate([
-      {
-        $match: {
-          ...campusFilter,
-          date: {
-            $gte: monthStart.toISOString().split('T')[0],
-            $lte: monthEnd.toISOString().split('T')[0]
-          },
-          score: { $gt: 0 } // Sadece başarılı projeler
-        }
-      },
-      {
-        $group: {
-          _id: '$login',
-          projectCount: { $sum: 1 },
-          totalScore: { $sum: '$score' },
-          projects: {
-            $push: {
-              project: '$project',
-              score: '$score',
-              date: '$date'
+    // TÜM AGGREGATİONLARI PARALEL ÇALIŞTIR
+    const [
+      topProjectSubmitters,
+      topLocationStats,
+      allTimeProjects,
+      allTimeWallet,
+      allTimePoints,
+      allTimeLevels
+    ] = await Promise.all([
+      // Bu ay en çok proje teslim edenler
+      Project.aggregate([
+        {
+          $match: {
+            ...campusFilter,
+            date: {
+              $gte: monthStart.toISOString().split('T')[0],
+              $lte: monthEnd.toISOString().split('T')[0]
+            },
+            score: { $gt: 0 }
+          }
+        },
+        {
+          $group: {
+            _id: '$login',
+            projectCount: { $sum: 1 },
+            totalScore: { $sum: '$score' },
+            projects: {
+              $push: {
+                project: '$project',
+                score: '$score',
+                date: '$date'
+              }
             }
           }
+        },
+        {
+          $sort: { projectCount: -1, totalScore: -1 }
+        },
+        {
+          $limit: 5
         }
-      },
-      {
-        $sort: { projectCount: -1, totalScore: -1 }
-      },
-      {
-        $limit: 5
-      }
-    ]);
-
-    // Top submitters için student bilgilerini al
-    const topSubmittersLogins = topProjectSubmitters.map((s: { _id: string }) => s._id);
-    const topSubmittersStudents = await Student.find({ login: { $in: topSubmittersLogins } })
-      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
-      .lean();
-    
-    // Patronage bilgilerini ekle
-    const topSubmittersStudentsWithPatronage = await addPatronageToStudents(topSubmittersStudents);
-    
-    // Projects bilgilerini al
-    const topSubmittersProjects = await Project.find({ login: { $in: topSubmittersLogins } })
-      .select('login project score status date')
-      .sort({ date: -1 })
-      .lean();
-
-    // Student bilgilerini merge et
-    const topSubmitters = topProjectSubmitters.map((proj: Record<string, unknown>) => {
-      const student = topSubmittersStudentsWithPatronage.find((s: Record<string, unknown>) => s.login === proj._id);
-      const projects = topSubmittersProjects.filter((p: Record<string, unknown>) => p.login === proj._id);
-      return {
-        login: proj._id,
-        projectCount: proj.projectCount,
-        totalScore: proj.totalScore,
-        projects: proj.projects,
-        student: student ? {
-          ...student,
-          projects: projects
-        } : null
-      };
-    });
-
-    // Son 3 ay en çok kampüste kalanlar (location stats)
-    const topLocationStats = await LocationStats.aggregate([
+      ]),
+      
+      // Son 3 ay en çok kampüste kalanlar
+      LocationStats.aggregate([
       {
         $match: campusFilter
       },
@@ -281,186 +243,152 @@ export default async function handler(
           totalDurationSeconds: 1
         }
       }
+      ]),
+
+      // Tüm zamanlar en çok proje teslim edenler
+      Project.aggregate([
+        {
+          $match: {
+            ...campusFilter,
+            score: { $gt: 0 }
+          }
+        },
+        {
+          $group: {
+            _id: '$login',
+            projectCount: { $sum: 1 },
+            totalScore: { $sum: '$score' }
+          }
+        },
+        {
+          $sort: { projectCount: -1, totalScore: -1 }
+        },
+        {
+          $limit: 5
+        }
+      ]),
+
+      // Tüm zamanlar en yüksek wallet
+      Student.find({ 
+        ...campusFilter,
+        wallet: { $exists: true, $ne: null } 
+      })
+        .select('login wallet')
+        .sort({ wallet: -1 })
+        .limit(5)
+        .lean(),
+
+      // Tüm zamanlar en yüksek evaluation points
+      Student.find({ 
+        ...campusFilter,
+        correction_point: { $exists: true, $ne: null } 
+      })
+        .select('login correction_point')
+        .sort({ correction_point: -1 })
+        .limit(5)
+        .lean(),
+
+      // Tüm zamanlar en yüksek level
+      Student.find({ 
+        ...campusFilter,
+        level: { $exists: true, $ne: null } 
+      })
+        .select('login level')
+        .sort({ level: -1 })
+        .limit(5)
+        .lean()
     ]);
 
-    // Top location stats için student bilgilerini al
-    const topLocationLogins = topLocationStats.map((s: { login: string }) => s.login);
-    const topLocationStudents = await Student.find({ login: { $in: topLocationLogins } })
-      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
-      .lean();
+    // TÜM LOGİNLERİ TOPLA (tekrarsız)
+    const allLogins = new Set<string>();
     
-    // Patronage bilgilerini ekle
-    const topLocationStudentsWithPatronage = await addPatronageToStudents(topLocationStudents);
-    
-    // Projects bilgilerini al
-    const topLocationProjects = await Project.find({ login: { $in: topLocationLogins } })
-      .select('login project score status date')
-      .sort({ date: -1 })
-      .lean();
+    topProjectSubmitters.forEach((s: { _id: string }) => allLogins.add(s._id));
+    topLocationStats.forEach((s: { login: string }) => allLogins.add(s.login));
+    allTimeProjects.forEach((s: { _id: string }) => allLogins.add(s._id));
+    allTimeWallet.forEach((s: Record<string, unknown>) => allLogins.add(s.login as string));
+    allTimePoints.forEach((s: Record<string, unknown>) => allLogins.add(s.login as string));
+    allTimeLevels.forEach((s: Record<string, unknown>) => allLogins.add(s.login as string));
 
-    // Student bilgilerini merge et
-    const topLocations = topLocationStats.map((loc: Record<string, unknown>) => {
-      const student = topLocationStudentsWithPatronage.find((s: Record<string, unknown>) => s.login === loc.login);
-      const projects = topLocationProjects.filter((p: Record<string, unknown>) => p.login === loc.login);
-      return {
-        login: loc.login,
-        totalDuration: loc.totalDuration,
-        student: student ? {
-          ...student,
-          projects: projects
-        } : null
-      };
-    });
+    const uniqueLogins = Array.from(allLogins);
 
-    // TÜM ZAMANLAR İSTATİSTİKLERİ
-
-    // Tüm zamanlar en çok proje teslim edenler
-    const allTimeProjects = await Project.aggregate([
-      {
-        $match: {
-          ...campusFilter,
-          score: { $gt: 0 } // Sadece başarılı projeler
-        }
-      },
-      {
-        $group: {
-          _id: '$login',
-          projectCount: { $sum: 1 },
-          totalScore: { $sum: '$score' }
-        }
-      },
-      {
-        $sort: { projectCount: -1, totalScore: -1 }
-      },
-      {
-        $limit: 5
-      }
+    // TEK SEFERDE TÜM STUDENT BİLGİLERİNİ ÇEK
+    const [allStudents, allPatronage, allProjects] = await Promise.all([
+      Student.find({ login: { $in: uniqueLogins } })
+        .select('login displayname image correction_point wallet grade level has_cheats cheat_count')
+        .lean(),
+      Patronage.find({ login: { $in: uniqueLogins } })
+        .select('login godfathers children')
+        .lean(),
+      Project.find({ login: { $in: uniqueLogins } })
+        .select('login project score status date')
+        .sort({ date: -1 })
+        .lean()
     ]);
 
-    // Tüm zamanlar en çok proje teslim edenler için student bilgileri
-    const allTimeProjectsLogins = allTimeProjects.map((s: { _id: string }) => s._id);
-    const allTimeProjectsStudents = await Student.find({ login: { $in: allTimeProjectsLogins } })
-      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
-      .lean();
-    
-    // Patronage bilgilerini ekle
-    const allTimeProjectsStudentsWithPatronage = await addPatronageToStudents(allTimeProjectsStudents);
-    
-    // Projects bilgilerini al
-    const allTimeProjectsProjectsList = await Project.find({ login: { $in: allTimeProjectsLogins } })
-      .select('login project score status date')
-      .sort({ date: -1 })
-      .lean();
-
-    const allTimeProjectsWithStudents = allTimeProjects.map((proj: Record<string, unknown>) => {
-      const student = allTimeProjectsStudentsWithPatronage.find((s: Record<string, unknown>) => s.login === proj._id);
-      const projects = allTimeProjectsProjectsList.filter((p: Record<string, unknown>) => p.login === proj._id);
+    // Patronage'ı merge et
+    const studentsWithPatronage = allStudents.map(student => {
+      const patronage = allPatronage.find((p: Record<string, unknown>) => p.login === student.login);
       return {
-        login: proj._id,
-        projectCount: proj.projectCount,
-        totalScore: proj.totalScore,
-        student: student ? {
-          ...student,
-          projects: projects
-        } : null
+        ...student,
+        patronage: patronage || null
       };
     });
 
-    // Tüm zamanlar en yüksek wallet
-    const allTimeWallet = await Student.find({ 
-      ...campusFilter,
-      wallet: { $exists: true, $ne: null } 
-    })
-      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
-      .sort({ wallet: -1 })
-      .limit(5)
-      .lean();
-    
-    // Patronage bilgilerini ekle
-    const allTimeWalletWithPatronage = await addPatronageToStudents(allTimeWallet);
-    
-    // Wallet için projects bilgilerini al
-    const allTimeWalletLogins = allTimeWallet.map((s: Record<string, unknown>) => s.login as string);
-    const allTimeWalletProjects = await Project.find({ login: { $in: allTimeWalletLogins } })
-      .select('login project score status date')
-      .sort({ date: -1 })
-      .lean();
-
-    const allTimeWalletFormatted = allTimeWalletWithPatronage.map((student: Record<string, unknown>) => {
-      const projects = allTimeWalletProjects.filter((p: Record<string, unknown>) => p.login === student.login);
+    // Helper: Login'e göre student bul
+    const getStudentWithProjects = (login: string) => {
+      const student = studentsWithPatronage.find((s: Record<string, unknown>) => s.login === login);
+      if (!student) return null;
+      const projects = allProjects.filter((p: Record<string, unknown>) => p.login === login);
       return {
-        login: student.login,
-        wallet: student.wallet,
-        student: {
-          ...student,
-          projects: projects
-        }
+        ...student,
+        projects: projects
       };
-    });
+    };
 
-    // Tüm zamanlar en yüksek evaluation points
-    const allTimePoints = await Student.find({ 
-      ...campusFilter,
-      correction_point: { $exists: true, $ne: null } 
-    })
-      .select('login displayname image correction_point wallet grade has_cheats cheat_count')
-      .sort({ correction_point: -1 })
-      .limit(5)
-      .lean();
-    
-    // Patronage bilgilerini ekle
-    const allTimePointsWithPatronage = await addPatronageToStudents(allTimePoints);
-    
-    // Points için projects bilgilerini al
-    const allTimePointsLogins = allTimePoints.map((s: Record<string, unknown>) => s.login as string);
-    const allTimePointsProjects = await Project.find({ login: { $in: allTimePointsLogins } })
-      .select('login project score status date')
-      .sort({ date: -1 })
-      .lean();
+    // Top submitters için student bilgilerini merge et
+    const topSubmitters = topProjectSubmitters.map((proj: Record<string, unknown>) => ({
+      login: proj._id,
+      projectCount: proj.projectCount,
+      totalScore: proj.totalScore,
+      projects: proj.projects,
+      student: getStudentWithProjects(proj._id as string)
+    }));
 
-    const allTimePointsFormatted = allTimePointsWithPatronage.map((student: Record<string, unknown>) => {
-      const projects = allTimePointsProjects.filter((p: Record<string, unknown>) => p.login === student.login);
-      return {
-        login: student.login,
-        correctionPoint: student.correction_point,
-        student: {
-          ...student,
-          projects: projects
-        }
-      };
-    });
+    // Top location stats için student bilgilerini merge et
+    const topLocations = topLocationStats.map((loc: Record<string, unknown>) => ({
+      login: loc.login,
+      totalDuration: loc.totalDuration,
+      student: getStudentWithProjects(loc.login as string)
+    }));
 
-    // Tüm zamanlar en yüksek level
-    const allTimeLevels = await Student.find({ 
-      ...campusFilter,
-      level: { $exists: true, $ne: null } 
-    })
-      .select('login displayname image correction_point wallet grade level has_cheats cheat_count')
-      .sort({ level: -1 })
-      .limit(5)
-      .lean();
-    
-    // Patronage bilgilerini ekle
-    const allTimeLevelsWithPatronage = await addPatronageToStudents(allTimeLevels);
-    
-    // Levels için projects bilgilerini al
-    const allTimeLevelsLogins = allTimeLevels.map((s: Record<string, unknown>) => s.login as string);
-    const allTimeLevelsProjects = await Project.find({ login: { $in: allTimeLevelsLogins } })
-      .select('login project score status date')
-      .sort({ date: -1 })
-      .lean();
+    // All time projects için student bilgilerini merge et
+    const allTimeProjectsWithStudents = allTimeProjects.map((proj: Record<string, unknown>) => ({
+      login: proj._id,
+      projectCount: proj.projectCount,
+      totalScore: proj.totalScore,
+      student: getStudentWithProjects(proj._id as string)
+    }));
 
-    const allTimeLevelsFormatted = allTimeLevelsWithPatronage.map((student: Record<string, unknown>) => {
-      const projects = allTimeLevelsProjects.filter((p: Record<string, unknown>) => p.login === student.login);
-      return {
-        login: student.login,
-        level: student.level,
-        student: {
-          ...student,
-          projects: projects
-        }
-      };
-    });
+    // All time wallet için student bilgilerini merge et
+    const allTimeWalletFormatted = allTimeWallet.map((student: Record<string, unknown>) => ({
+      login: student.login,
+      wallet: student.wallet,
+      student: getStudentWithProjects(student.login as string)
+    }));
+
+    // All time points için student bilgilerini merge et
+    const allTimePointsFormatted = allTimePoints.map((student: Record<string, unknown>) => ({
+      login: student.login,
+      correctionPoint: student.correction_point,
+      student: getStudentWithProjects(student.login as string)
+    }));
+
+    // All time levels için student bilgilerini merge et
+    const allTimeLevelsFormatted = allTimeLevels.map((student: Record<string, unknown>) => ({
+      login: student.login,
+      level: student.level,
+      student: getStudentWithProjects(student.login as string)
+    }));
 
     return res.status(200).json({
       currentMonth,
