@@ -459,6 +459,30 @@ export default async function handler(
         }
       },
 
+      // Cheat projects lookup
+      {
+        $lookup: {
+          from: 'projects',
+          let: { login: '$login' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$login', '$$login'] },
+                    { $eq: ['$status', 'fail'] },
+                    { $eq: ['$score', -42] }
+                  ]
+                }
+              }
+            },
+            { $sort: { date: -1 } },
+            { $project: { project: 1, score: 1, status: 1, date: 1, _id: 0 } }
+          ],
+          as: 'cheatProjects'
+        }
+      },
+
       // Patronage lookup
       {
         $lookup: {
@@ -638,6 +662,7 @@ export default async function handler(
           patronageData: 0,
           locationData: 0,
           feedbackData: 0
+          // cheatProjects kalacak - silinmeyecek
         }
       }
     ];

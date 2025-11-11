@@ -49,6 +49,7 @@ interface Student {
   project_count?: number;
   has_cheats?: boolean;
   cheat_count?: number;
+  cheatProjects?: Project[];
   patronage?: Patronage | null;
   godfather_count?: number;
   children_count?: number;
@@ -489,14 +490,12 @@ function Students() {
             ) : (
               <div className="project-sections">
                 {/* Cheating Records */}
-                {selectedStudent.has_cheats && selectedStudent.cheat_count && selectedStudent.cheat_count > 0 && (
+                {selectedStudent.has_cheats && selectedStudent.cheatProjects && selectedStudent.cheatProjects.length > 0 && (
                   <div className="cheat-list">
                     <h3 style={{ color: '#ef4444', marginBottom: '1rem' }}>
-                      ⚠️ Cheating Records ({selectedStudent.cheat_count})
+                      ⚠️ Cheating Records ({selectedStudent.cheatProjects.length})
                     </h3>
-                    {selectedStudent.projects
-                      .filter((p) => p.score === -42 && p.status === 'fail')
-                      .map((cheat, index) => (
+                    {selectedStudent.cheatProjects.map((cheat, index) => (
                         <div key={index} className="cheat-item">
                           <h4>{cheat.project}</h4>
                           <p><strong>Score:</strong> {cheat.score}</p>
