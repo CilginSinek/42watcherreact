@@ -354,11 +354,16 @@ export default async function handler(
                         input: '$feedbackData',
                         as: 'fb',
                         in: {
-                          $toDouble: {
-                            $arrayElemAt: [
-                              { $split: ['$$fb.rating', ' / '] },
-                              0
-                            ]
+                          $convert: {
+                            input: {
+                              $arrayElemAt: [
+                                { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
+                                0
+                              ]
+                            },
+                            to: 'double',
+                            onError: 0,
+                            onNull: 0
                           }
                         }
                       }
@@ -385,11 +390,16 @@ export default async function handler(
                                 input: '$feedbackData',
                                 as: 'fb',
                                 in: {
-                                  $toDouble: {
-                                    $arrayElemAt: [
-                                      { $split: ['$$fb.rating', ' / '] },
-                                      0
-                                    ]
+                                  $convert: {
+                                    input: {
+                                      $arrayElemAt: [
+                                        { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
+                                        0
+                                      ]
+                                    },
+                                    to: 'double',
+                                    onError: 0,
+                                    onNull: 0
                                   }
                                 }
                               }
@@ -578,11 +588,16 @@ export default async function handler(
                         input: '$feedbackData',
                         as: 'fb',
                         in: {
-                          $toDouble: {
-                            $arrayElemAt: [
-                              { $split: ['$$fb.rating', ' / '] },
-                              0
-                            ]
+                          $convert: {
+                            input: {
+                              $arrayElemAt: [
+                                { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
+                                0
+                              ]
+                            },
+                            to: 'double',
+                            onError: 0,
+                            onNull: 0
                           }
                         }
                       }
@@ -606,11 +621,16 @@ export default async function handler(
                           input: '$feedbackData',
                           as: 'fb',
                           in: {
-                            $toDouble: {
-                              $arrayElemAt: [
-                                { $split: ['$$fb.ratingDetails.nice', ' / '] },
-                                0
-                              ]
+                            $convert: {
+                              input: {
+                                $arrayElemAt: [
+                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.nice', '0'] }, ' / '] },
+                                  0
+                                ]
+                              },
+                              to: 'double',
+                              onError: 0,
+                              onNull: 0
                             }
                           }
                         }
@@ -627,11 +647,16 @@ export default async function handler(
                           input: '$feedbackData',
                           as: 'fb',
                           in: {
-                            $toDouble: {
-                              $arrayElemAt: [
-                                { $split: ['$$fb.ratingDetails.rigorous', ' / '] },
-                                0
-                              ]
+                            $convert: {
+                              input: {
+                                $arrayElemAt: [
+                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.rigorous', '0'] }, ' / '] },
+                                  0
+                                ]
+                              },
+                              to: 'double',
+                              onError: 0,
+                              onNull: 0
                             }
                           }
                         }
@@ -648,11 +673,16 @@ export default async function handler(
                           input: '$feedbackData',
                           as: 'fb',
                           in: {
-                            $toDouble: {
-                              $arrayElemAt: [
-                                { $split: ['$$fb.ratingDetails.interested', ' / '] },
-                                0
-                              ]
+                            $convert: {
+                              input: {
+                                $arrayElemAt: [
+                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.interested', '0'] }, ' / '] },
+                                  0
+                                ]
+                              },
+                              to: 'double',
+                              onError: 0,
+                              onNull: 0
                             }
                           }
                         }
@@ -669,11 +699,16 @@ export default async function handler(
                           input: '$feedbackData',
                           as: 'fb',
                           in: {
-                            $toDouble: {
-                              $arrayElemAt: [
-                                { $split: ['$$fb.ratingDetails.punctuality', ' / '] },
-                                0
-                              ]
+                            $convert: {
+                              input: {
+                                $arrayElemAt: [
+                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.punctuality', '0'] }, ' / '] },
+                                  0
+                                ]
+                              },
+                              to: 'double',
+                              onError: 0,
+                              onNull: 0
                             }
                           }
                         }
@@ -701,11 +736,16 @@ export default async function handler(
                                 input: '$feedbackData',
                                 as: 'fb',
                                 in: {
-                                  $toDouble: {
-                                    $arrayElemAt: [
-                                      { $split: ['$$fb.rating', ' / '] },
-                                      0
-                                    ]
+                                  $convert: {
+                                    input: {
+                                      $arrayElemAt: [
+                                        { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
+                                        0
+                                      ]
+                                    },
+                                    to: 'double',
+                                    onError: 0,
+                                    onNull: 0
                                   }
                                 }
                               }

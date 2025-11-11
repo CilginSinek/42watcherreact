@@ -408,19 +408,19 @@ function Students() {
                     <div className="stat-list">
                       <div className="stat-item">
                         <span className="stat-label">😊 Nice:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.nice ?? 0).toFixed(2)} / 5</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.nice ?? 0).toFixed(2)} / 4</span>
                       </div>
                       <div className="stat-item">
                         <span className="stat-label">🎯 Rigorous:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.rigorous ?? 0).toFixed(2)} / 5</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.rigorous ?? 0).toFixed(2)} / 4</span>
                       </div>
                       <div className="stat-item">
                         <span className="stat-label">🤔 Interested:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.interested ?? 0).toFixed(2)} / 5</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.interested ?? 0).toFixed(2)} / 4</span>
                       </div>
                       <div className="stat-item">
                         <span className="stat-label">⏰ Punctuality:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.punctuality ?? 0).toFixed(2)} / 5</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.punctuality ?? 0).toFixed(2)} / 4</span>
                       </div>
                     </div>
                   </div>
