@@ -344,23 +344,33 @@ export default async function handler(
         $addFields: {
           feedbackCount: { $size: '$feedbackData' },
           avgRating: {
-            $cond: {
-              if: { $gt: [{ $size: '$feedbackData' }, 0] },
-              then: { $avg: '$feedbackData.rating' },
-              else: 0
-            }
+            $ifNull: [
+              {
+                $cond: {
+                  if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                  then: { $avg: '$feedbackData.rating' },
+                  else: 0
+                }
+              },
+              0
+            ]
           },
           evoPerformance: {
-            $cond: {
-              if: { $gt: [{ $size: '$feedbackData' }, 0] },
-              then: {
-                $add: [
-                  { $multiply: [{ $avg: '$feedbackData.rating' }, 10] },
-                  { $size: '$feedbackData' }
-                ]
+            $ifNull: [
+              {
+                $cond: {
+                  if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                  then: {
+                    $add: [
+                      { $multiply: [{ $avg: '$feedbackData.rating' }, 10] },
+                      { $size: '$feedbackData' }
+                    ]
+                  },
+                  else: 0
+                }
               },
-              else: 0
-            }
+              0
+            ]
           }
         }
       });
@@ -523,53 +533,83 @@ export default async function handler(
           
           feedbackCount: { $size: '$feedbackData' },
           avgRating: {
-            $cond: {
-              if: { $gt: [{ $size: '$feedbackData' }, 0] },
-              then: { $avg: '$feedbackData.rating' },
-              else: 0
-            }
+            $ifNull: [
+              {
+                $cond: {
+                  if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                  then: { $avg: '$feedbackData.rating' },
+                  else: 0
+                }
+              },
+              0
+            ]
           },
           avgRatingDetails: {
             nice: {
-              $cond: {
-                if: { $gt: [{ $size: '$feedbackData' }, 0] },
-                then: { $avg: '$feedbackData.ratingDetails.nice' },
-                else: 0
-              }
+              $ifNull: [
+                {
+                  $cond: {
+                    if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                    then: { $avg: '$feedbackData.ratingDetails.nice' },
+                    else: 0
+                  }
+                },
+                0
+              ]
             },
             rigorous: {
-              $cond: {
-                if: { $gt: [{ $size: '$feedbackData' }, 0] },
-                then: { $avg: '$feedbackData.ratingDetails.rigorous' },
-                else: 0
-              }
+              $ifNull: [
+                {
+                  $cond: {
+                    if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                    then: { $avg: '$feedbackData.ratingDetails.rigorous' },
+                    else: 0
+                  }
+                },
+                0
+              ]
             },
             interested: {
-              $cond: {
-                if: { $gt: [{ $size: '$feedbackData' }, 0] },
-                then: { $avg: '$feedbackData.ratingDetails.interested' },
-                else: 0
-              }
+              $ifNull: [
+                {
+                  $cond: {
+                    if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                    then: { $avg: '$feedbackData.ratingDetails.interested' },
+                    else: 0
+                  }
+                },
+                0
+              ]
             },
             punctuality: {
-              $cond: {
-                if: { $gt: [{ $size: '$feedbackData' }, 0] },
-                then: { $avg: '$feedbackData.ratingDetails.punctuality' },
-                else: 0
-              }
+              $ifNull: [
+                {
+                  $cond: {
+                    if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                    then: { $avg: '$feedbackData.ratingDetails.punctuality' },
+                    else: 0
+                  }
+                },
+                0
+              ]
             }
           },
           evoPerformance: {
-            $cond: {
-              if: { $gt: [{ $size: '$feedbackData' }, 0] },
-              then: {
-                $add: [
-                  { $multiply: [{ $avg: '$feedbackData.rating' }, 10] },
-                  { $size: '$feedbackData' }
-                ]
+            $ifNull: [
+              {
+                $cond: {
+                  if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                  then: {
+                    $add: [
+                      { $multiply: [{ $avg: '$feedbackData.rating' }, 10] },
+                      { $size: '$feedbackData' }
+                    ]
+                  },
+                  else: 0
+                }
               },
-              else: 0
-            }
+              0
+            ]
           }
         }
       },
