@@ -219,9 +219,6 @@ export default async function handler(
     // Phase 1: Lightweight pipeline to get sorted logins only
     // Phase 2: Detailed data fetch for selected logins only
     
-    // Get total count first (without heavy lookups)
-    const total = await Student.countDocuments(matchFilter);
-
     // PHASE 1: Lightweight aggregation for sorting and pagination
     // Only calculate fields needed for sorting, keep documents small
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -355,7 +352,7 @@ export default async function handler(
                   }
                 }
               },
-              else: 0
+              else: null
             }
           },
           evoPerformance: {
@@ -380,12 +377,26 @@ export default async function handler(
                   { $size: '$feedbackData' }
                 ]
               },
-              else: 0
+              else: null
             }
           }
         }
       });
     }
+
+    // Filter out students without feedback when sorting by feedback-related fields
+    if (actualSortField === 'evoPerformance' || actualSortField === 'feedbackCount' || actualSortField === 'avgRating') {
+      smallPipeline.push({
+        $match: {
+          feedbackCount: { $gt: 0 }
+        }
+      });
+    }
+
+    // Get total count before pagination (after filtering)
+    const countPipeline = [...smallPipeline, { $count: 'total' }];
+    const countResult = await Student.aggregate(countPipeline);
+    const total = countResult.length > 0 ? countResult[0].total : 0;
 
     // Sort and paginate on small documents
     const sortStage: Record<string, 1 | -1> = {};
