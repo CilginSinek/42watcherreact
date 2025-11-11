@@ -38,6 +38,15 @@ interface StudentFull {
   has_cheats?: boolean;
   cheat_count?: number;
   patronage?: Patronage | null;
+  feedbackCount?: number;
+  avgRating?: number;
+  avgRatingDetails?: {
+    nice: number;
+    rigorous: number;
+    interested: number;
+    punctuality: number;
+  };
+  evoPerformance?: number;
 }
 
 interface Student {
@@ -53,6 +62,15 @@ interface Student {
   patronage?: Patronage | null;
   has_cheats?: boolean;
   cheat_count?: number;
+  feedbackCount?: number;
+  avgRating?: number;
+  avgRatingDetails?: {
+    nice: number;
+    rigorous: number;
+    interested: number;
+    punctuality: number;
+  };
+  evoPerformance?: number;
 }
 
 interface TopSubmitter {
@@ -475,6 +493,55 @@ function Dashboard() {
               </h2>
               <button className="close-btn" onClick={closeModal} aria-label="Close modal"></button>
             </div>
+
+            {/* Evaluation Performance Section */}
+            {selectedStudent.feedbackCount !== undefined && selectedStudent.feedbackCount > 0 && (
+              <div className="patronage-section">
+                <h3 style={{ color: '#10b981', marginBottom: '1rem' }}>
+                  ⭐ Evaluation Performance
+                </h3>
+                <div className="patronage-grid-two">
+                  <div className="patronage-box">
+                    <h4>📊 Overall Stats</h4>
+                    <div className="stat-list">
+                      <div className="stat-row">
+                        <span className="stat-label">Total Feedbacks:</span>
+                        <span className="stat-value">{selectedStudent.feedbackCount}</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">Average Rating:</span>
+                        <span className="stat-value">{(selectedStudent.avgRating ?? 0).toFixed(2)} / 5.00</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">Evo Performance:</span>
+                        <span className="stat-value">{(selectedStudent.evoPerformance ?? 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="patronage-box">
+                    <h4>⭐ Rating Details</h4>
+                    <div className="stat-list">
+                      <div className="stat-row">
+                        <span className="stat-label">😊 Nice:</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.nice ?? 0).toFixed(2)} / 4</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">🎯 Rigorous:</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.rigorous ?? 0).toFixed(2)} / 4</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">🤔 Interested:</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.interested ?? 0).toFixed(2)} / 4</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">⏰ Punctuality:</span>
+                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.punctuality ?? 0).toFixed(2)} / 4</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Patronage Section */}
             {selectedStudent.patronage && (

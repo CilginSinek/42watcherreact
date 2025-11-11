@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose from 'mongoose';
-import { Student, Project, LocationStats, Patronage } from '../models/Student.js';
+import { Student, Project, LocationStats, Patronage, Feedback } from '../models/Student.js';
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -312,7 +312,7 @@ export default async function handler(
     const uniqueLogins = Array.from(allLogins);
 
     // TEK SEFERDE TÜM STUDENT BİLGİLERİNİ ÇEK
-    const [allStudents, allPatronage, allProjects] = await Promise.all([
+    const [allStudents, allPatronage, allProjects, allFeedbacks] = await Promise.all([
       Student.find({ login: { $in: uniqueLogins } })
         .select('login displayname image correction_point wallet grade level has_cheats cheat_count')
         .lean(),
@@ -322,15 +322,55 @@ export default async function handler(
       Project.find({ login: { $in: uniqueLogins } })
         .select('login project score status date')
         .sort({ date: -1 })
+        .lean(),
+      Feedback.find({ login: { $in: uniqueLogins } })
+        .select('login rating ratingDetails')
         .lean()
     ]);
 
-    // Patronage'ı merge et
+    // Patronage ve Feedback'leri merge et
     const studentsWithPatronage = allStudents.map(student => {
       const patronage = allPatronage.find((p: Record<string, unknown>) => p.login === student.login);
+      const feedbacks = allFeedbacks.filter((f: Record<string, unknown>) => f.login === student.login);
+      
+      // Feedback metrics hesapla
+      let feedbackCount = 0;
+      let avgRating = null;
+      let avgRatingDetails = null;
+      
+      if (feedbacks.length > 0) {
+        feedbackCount = feedbacks.length;
+        
+        // Average rating hesapla
+        const totalRating = feedbacks.reduce((sum: number, f: Record<string, unknown>) => 
+          sum + (f.rating as number || 0), 0);
+        avgRating = totalRating / feedbackCount;
+        
+        // Average rating details hesapla
+        const totalNice = feedbacks.reduce((sum: number, f: Record<string, unknown>) => 
+          sum + ((f.ratingDetails as Record<string, number>)?.nice || 0), 0);
+        const totalRigorous = feedbacks.reduce((sum: number, f: Record<string, unknown>) => 
+          sum + ((f.ratingDetails as Record<string, number>)?.rigorous || 0), 0);
+        const totalInterested = feedbacks.reduce((sum: number, f: Record<string, unknown>) => 
+          sum + ((f.ratingDetails as Record<string, number>)?.interested || 0), 0);
+        const totalPunctuality = feedbacks.reduce((sum: number, f: Record<string, unknown>) => 
+          sum + ((f.ratingDetails as Record<string, number>)?.punctuality || 0), 0);
+        
+        avgRatingDetails = {
+          nice: totalNice / feedbackCount,
+          rigorous: totalRigorous / feedbackCount,
+          interested: totalInterested / feedbackCount,
+          punctuality: totalPunctuality / feedbackCount
+        };
+      }
+      
       return {
         ...student,
-        patronage: patronage || null
+        patronage: patronage || null,
+        feedbackCount,
+        avgRating,
+        avgRatingDetails,
+        evoPerformance: avgRating ? (avgRating * 10) + feedbackCount : null
       };
     });
 
