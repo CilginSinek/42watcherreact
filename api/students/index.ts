@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose from 'mongoose';
-import { Student, Project } from '../models/Student.js';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Student, Project, Feedback } from '../models/Student.js';
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -206,7 +207,10 @@ export default async function handler(
       'children_count': 'childrenCount',
       'cheat_count': 'cheatCount',
       'project_count': 'projectCount',
-      'log_time': 'logTime'
+      'log_time': 'logTime',
+      'evo_performance': 'evoPerformance',
+      'feedback_count': 'feedbackCount',
+      'avg_rating': 'avgRating'
     };
 
     const actualSortField = sortFieldMap[sortBy as string] || sortBy;
@@ -346,7 +350,75 @@ export default async function handler(
         }
       },
 
-      // 5. Son 10 projeyi ekle ve gereksiz alanları kaldır
+      // 5. Feedback lookup ve evaluation metrics hesaplama
+      {
+        $lookup: {
+          from: 'feedbacks',
+          localField: 'login',
+          foreignField: 'login',
+          as: 'feedbackData'
+        }
+      },
+      {
+        $addFields: {
+          // Feedback count
+          feedbackCount: { $size: '$feedbackData' },
+          // Average rating
+          avgRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$feedbackData' }, 0] },
+              then: { $avg: '$feedbackData.rating' },
+              else: 0
+            }
+          },
+          // Average rating details
+          avgRatingDetails: {
+            nice: {
+              $cond: {
+                if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                then: { $avg: '$feedbackData.ratingDetails.nice' },
+                else: 0
+              }
+            },
+            rigorous: {
+              $cond: {
+                if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                then: { $avg: '$feedbackData.ratingDetails.rigorous' },
+                else: 0
+              }
+            },
+            interested: {
+              $cond: {
+                if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                then: { $avg: '$feedbackData.ratingDetails.interested' },
+                else: 0
+              }
+            },
+            punctuality: {
+              $cond: {
+                if: { $gt: [{ $size: '$feedbackData' }, 0] },
+                then: { $avg: '$feedbackData.ratingDetails.punctuality' },
+                else: 0
+              }
+            }
+          },
+          // Evo performance score (weighted: feedback count + average rating)
+          evoPerformance: {
+            $cond: {
+              if: { $gt: [{ $size: '$feedbackData' }, 0] },
+              then: {
+                $add: [
+                  { $multiply: [{ $avg: '$feedbackData.rating' }, 10] }, // Rating weight
+                  { $size: '$feedbackData' } // Feedback count
+                ]
+              },
+              else: 0
+            }
+          }
+        }
+      },
+
+      // 6. Son 10 projeyi ekle ve gereksiz alanları kaldır
       {
         $addFields: {
           projects: {
@@ -378,17 +450,18 @@ export default async function handler(
           __v: 0,
           projectsData: 0,
           patronageData: 0,
-          locationData: 0
+          locationData: 0,
+          feedbackData: 0
         }
       }
     ];
 
-    // 6. Sıralama ekle
+    // 7. Sıralama ekle
     const sortStage: Record<string, 1 | -1> = {};
     sortStage[actualSortField as string] = sortOrder as 1 | -1;
     pipeline.push({ $sort: sortStage });
 
-    // 7. Facet ile pagination ve count
+    // 8. Facet ile pagination ve count
     pipeline.push({
       $facet: {
         metadata: [{ $count: 'total' }],

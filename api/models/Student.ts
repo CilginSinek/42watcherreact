@@ -100,10 +100,27 @@ const patronageSchema = new mongoose.Schema({
   lastUpdated: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+// Feedback Schema for evaluation performance
+const feedbackSchema = new mongoose.Schema({
+  login: { type: String, required: true, index: true },
+  evaluator: { type: String, required: true, index: true },
+  project: { type: String, required: true },
+  rating: { type: Number, required: true, min: 0, max: 5 },
+  ratingDetails: {
+    nice: { type: Number, min: 0, max: 5 },
+    rigorous: { type: Number, min: 0, max: 5 },
+    interested: { type: Number, min: 0, max: 5 },
+    punctuality: { type: Number, min: 0, max: 5 }
+  },
+  comment: { type: String },
+  date: { type: Date, default: Date.now, index: true }
+}, { timestamps: true });
+
 export const Student = mongoose.models.Student || mongoose.model("Student", studentSchema);
 export const Project = mongoose.models.Project || mongoose.model("Project", projectSchema);
 export const LocationStats = mongoose.models.LocationStats || mongoose.model("LocationStats", locationStatsSchema);
 export const Patronage = mongoose.models.Patronage || mongoose.model("Patronage", patronageSchema);
+export const Feedback = mongoose.models.Feedback || mongoose.model("Feedback", feedbackSchema);
 
 // Backward compatibility - Cheater is now Project with score -42
 export const Cheater = Project;

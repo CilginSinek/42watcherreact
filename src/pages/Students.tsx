@@ -52,6 +52,15 @@ interface Student {
   patronage?: Patronage | null;
   godfather_count?: number;
   children_count?: number;
+  feedbackCount?: number;
+  avgRating?: number;
+  avgRatingDetails?: {
+    nice: number;
+    rigorous: number;
+    interested: number;
+    punctuality: number;
+  };
+  evoPerformance?: number;
 }
 
 interface PaginationInfo {
@@ -242,6 +251,9 @@ function Students() {
               <option value="log_time">Log Time</option>
               <option value="godfather_count">Godfather Count</option>
               <option value="children_count">Children Count</option>
+              <option value="evo_performance">Evo Performance</option>
+              <option value="feedback_count">Feedback Count</option>
+              <option value="avg_rating">Average Rating</option>
             </select>
 
             <button 
@@ -366,6 +378,55 @@ function Students() {
               </h2>
               <button className="close-btn" onClick={closeModal} aria-label="Close modal"></button>
             </div>
+
+            {/* Evaluation Performance Section */}
+            {selectedStudent.feedbackCount !== undefined && selectedStudent.feedbackCount > 0 && (
+              <div className="patronage-section">
+                <h3 style={{ color: '#10b981', marginBottom: '1rem' }}>
+                  ⭐ Evaluation Performance
+                </h3>
+                <div className="patronage-grid-two">
+                  <div className="patronage-box">
+                    <h4>📊 Overall Stats</h4>
+                    <div className="stat-list">
+                      <div className="stat-item">
+                        <span className="stat-label">Total Feedbacks:</span>
+                        <span className="stat-value">{selectedStudent.feedbackCount}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Average Rating:</span>
+                        <span className="stat-value">{selectedStudent.avgRating?.toFixed(2) || '0.00'} / 5.00</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Evo Performance:</span>
+                        <span className="stat-value">{selectedStudent.evoPerformance?.toFixed(2) || '0.00'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="patronage-box">
+                    <h4>⭐ Rating Details</h4>
+                    <div className="stat-list">
+                      <div className="stat-item">
+                        <span className="stat-label">😊 Nice:</span>
+                        <span className="stat-value">{selectedStudent.avgRatingDetails?.nice.toFixed(2) || '0.00'} / 5</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">🎯 Rigorous:</span>
+                        <span className="stat-value">{selectedStudent.avgRatingDetails?.rigorous.toFixed(2) || '0.00'} / 5</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">🤔 Interested:</span>
+                        <span className="stat-value">{selectedStudent.avgRatingDetails?.interested.toFixed(2) || '0.00'} / 5</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">⏰ Punctuality:</span>
+                        <span className="stat-value">{selectedStudent.avgRatingDetails?.punctuality.toFixed(2) || '0.00'} / 5</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Patronage Section */}
             {selectedStudent.patronage && (

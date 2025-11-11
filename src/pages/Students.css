@@ -817,6 +817,39 @@
   min-height: 36px;
 }
 
+.stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.stat-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+  transform: translateX(3px);
+}
+
+.stat-label {
+  font-weight: 500;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.stat-value {
+  font-weight: 700;
+  color: #667eea;
+  font-size: 1rem;
+}
+
 .no-data {
   color: #999;
   font-style: italic;
