@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose from 'mongoose';
-import { Student, Project, Patronage, LocationStats } from '../models/Student.js';
+import { Student, Project } from '../models/Student.js';
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -48,6 +48,28 @@ async function connectDB() {
 
   return cached.conn;
 }
+
+/**
+ * REQUIRED INDEXES FOR OPTIMAL PERFORMANCE:
+ * 
+ * Students collection:
+ *   db.students.createIndex({ login: 1 })
+ *   db.students.createIndex({ campusId: 1 })
+ *   db.students.createIndex({ login: 1, campusId: 1 })
+ *   db.students.createIndex({ correction_point: -1 })
+ *   db.students.createIndex({ wallet: -1 })
+ *   db.students.createIndex({ created_at: -1 })
+ * 
+ * Projects collection:
+ *   db.projects.createIndex({ login: 1 })
+ *   db.projects.createIndex({ login: 1, status: 1, score: 1 })
+ * 
+ * Patronages collection:
+ *   db.patronages.createIndex({ login: 1 })
+ * 
+ * LocationStats collection:
+ *   db.locationstats.createIndex({ login: 1 })
+ */
 
 export default async function handler(
   req: VercelRequest,
@@ -103,25 +125,25 @@ export default async function handler(
     // Query parametreleri
     const { 
       search, 
-      status, // 'all', 'active', 'blackhole', 'piscine', 'transfer', 'alumni', 'cheaters', 'staff', 'test'
-      campusId, // '49' (Istanbul), '50' (Kocaeli)
-      sortBy = 'login', // 'login', 'correction_point', 'wallet', 'created_at', 'cheat_count', 'project_count', 'log_time', 'godfather_count', 'children_count'
-      order = 'asc', // 'asc', 'desc'
+      status,
+      campusId,
+      sortBy = 'login',
+      order = 'asc',
       limit = '100',
       page = '1'
     } = req.query;
 
     // Filter oluştur
-    const filter: Record<string, unknown> = {};
+    const matchFilter: Record<string, unknown> = {};
 
     // Campus filter
     if (campusId && typeof campusId === 'string') {
-      filter.campusId = parseInt(campusId);
+      matchFilter.campusId = parseInt(campusId);
     }
 
-    // Search filter (login, displayname, email)
+    // Search filter
     if (search && typeof search === 'string') {
-      filter.$or = [
+      matchFilter.$or = [
         { login: { $regex: search, $options: 'i' } },
         { displayname: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
@@ -132,244 +154,258 @@ export default async function handler(
     if (status && typeof status === 'string') {
       switch (status) {
         case 'staff':
-          filter['staff?'] = true;
+          matchFilter['staff?'] = true;
           break;
         case 'test':
-          filter.is_test = true;
+          matchFilter.is_test = true;
           break;
         case 'active':
-          filter['active?'] = true;
-          filter['alumni?'] = { $ne: true };
-          filter.blackholed = { $ne: true };
-          filter.is_piscine = false;
+          matchFilter['active?'] = true;
+          matchFilter['alumni?'] = { $ne: true };
+          matchFilter.blackholed = { $ne: true };
+          matchFilter.is_piscine = false;
           break;
         case 'blackhole':
-          filter.blackholed = true;
+          matchFilter.blackholed = true;
           break;
         case 'piscine':
-          filter.is_piscine = true;
+          matchFilter.is_piscine = true;
           break;
         case 'transfer':
-          filter.is_trans = true;
+          matchFilter.is_trans = true;
           break;
         case 'alumni':
-          filter['alumni?'] = true;
+          matchFilter['alumni?'] = true;
           break;
         case 'sinker':
-          filter.sinker = true;
+          matchFilter.sinker = true;
           break;
         case 'freeze':
-          filter.freeze = true;
+          matchFilter.freeze = true;
           break;
         case 'cheaters': {
-          // Cheaters filter: Students with projects having status 'fail' and score -42
           const cheaterLogins = await Project.distinct('login', { 
             status: 'fail',
             score: -42 
           });
-          filter.login = { $in: cheaterLogins };
+          matchFilter.login = { $in: cheaterLogins };
           break;
         }
       }
-    }
-
-    // Sorting
-    const sortOrder = order === 'desc' ? -1 : 1;
-    const sort: { [key: string]: 1 | -1 } = {};
-    const isCheatCountSort = sortBy === 'cheat_count';
-    const isProjectCountSort = sortBy === 'project_count';
-    const isLogTimeSort = sortBy === 'log_time';
-    const isGodfatherCountSort = sortBy === 'godfather_count';
-    const isChildrenCountSort = sortBy === 'children_count';
-    const needsMemorySort = isCheatCountSort || isProjectCountSort || isLogTimeSort;
-    const needsAggregationSort = isGodfatherCountSort || isChildrenCountSort;
-    
-    if (typeof sortBy === 'string' && !needsMemorySort && !needsAggregationSort) {
-      sort[sortBy] = sortOrder as 1 | -1;
     }
 
     // Pagination
     const limitNum = parseInt(limit as string) || 100;
     const pageNum = parseInt(page as string) || 1;
     const skip = (pageNum - 1) * limitNum;
+    const sortOrder = order === 'desc' ? -1 : 1;
 
-    let students: Record<string, unknown>[] = [];
-    let total = 0;
+    // Sort field mapping
+    const sortFieldMap: Record<string, string> = {
+      'godfather_count': 'godfatherCount',
+      'children_count': 'childrenCount',
+      'cheat_count': 'cheatCount',
+      'project_count': 'projectCount',
+      'log_time': 'logTime'
+    };
 
-    // Godfather/Children count için aggregation kullan (DB'de sıralama)
-    if (needsAggregationSort) {
-      const sortField = isGodfatherCountSort ? 'godfatherCount' : 'childrenCount';
-      
-      const pipeline = [
-        { $match: filter },
-        {
-          $lookup: {
-            from: 'patronages',
-            localField: 'login',
-            foreignField: 'login',
-            as: 'patronageData'
-          }
-        },
-        {
-          $addFields: {
-            godfatherCount: {
-              $size: {
-                $ifNull: [
-                  { $arrayElemAt: ['$patronageData.godfathers', 0] },
-                  []
-                ]
+    const actualSortField = sortFieldMap[sortBy as string] || sortBy;
+
+    // OPTIMIZED AGGREGATION PIPELINE - Tüm işlemler MongoDB'de
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pipeline: any[] = [
+      // 1. İlk filtreleme
+      { $match: matchFilter },
+
+      // 2. Projects lookup ve hesaplama
+      {
+        $lookup: {
+          from: 'projects',
+          localField: 'login',
+          foreignField: 'login',
+          as: 'projectsData'
+        }
+      },
+      {
+        $addFields: {
+          // Success project count
+          projectCount: {
+            $size: {
+              $filter: {
+                input: '$projectsData',
+                as: 'proj',
+                cond: { $eq: ['$$proj.status', 'success'] }
               }
-            },
-            childrenCount: {
-              $size: {
-                $ifNull: [
-                  { $arrayElemAt: ['$patronageData.children', 0] },
-                  []
+            }
+          },
+          // Cheat count
+          cheatCount: {
+            $size: {
+              $filter: {
+                input: '$projectsData',
+                as: 'proj',
+                cond: {
+                  $and: [
+                    { $eq: ['$$proj.status', 'fail'] },
+                    { $eq: ['$$proj.score', -42] }
+                  ]
+                }
+              }
+            }
+          },
+          // Has cheats flag
+          has_cheats: {
+            $gt: [
+              {
+                $size: {
+                  $filter: {
+                    input: '$projectsData',
+                    as: 'proj',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$proj.status', 'fail'] },
+                        { $eq: ['$$proj.score', -42] }
+                      ]
+                    }
+                  }
+                }
+              },
+              0
+            ]
+          }
+        }
+      },
+
+      // 3. Patronage lookup
+      {
+        $lookup: {
+          from: 'patronages',
+          localField: 'login',
+          foreignField: 'login',
+          as: 'patronageData'
+        }
+      },
+      {
+        $addFields: {
+          patronage: { $arrayElemAt: ['$patronageData', 0] },
+          godfatherCount: {
+            $size: {
+              $ifNull: [
+                { $arrayElemAt: ['$patronageData.godfathers', 0] },
+                []
+              ]
+            }
+          },
+          childrenCount: {
+            $size: {
+              $ifNull: [
+                { $arrayElemAt: ['$patronageData.children', 0] },
+                []
+              ]
+            }
+          }
+        }
+      },
+
+      // 4. LocationStats lookup ve duration hesaplama
+      {
+        $lookup: {
+          from: 'locationstats',
+          localField: 'login',
+          foreignField: 'login',
+          as: 'locationData'
+        }
+      },
+      {
+        $addFields: {
+          logTime: {
+            $reduce: {
+              input: { $objectToArray: { $ifNull: [{ $arrayElemAt: ['$locationData.months', 0] }, {}] } },
+              initialValue: 0,
+              in: {
+                $add: [
+                  '$$value',
+                  {
+                    $let: {
+                      vars: {
+                        timeParts: { $split: [{ $ifNull: ['$$this.v.totalDuration', '00:00:00'] }, ':'] }
+                      },
+                      in: {
+                        $add: [
+                          { $multiply: [{ $toInt: { $arrayElemAt: ['$$timeParts', 0] } }, 3600] },
+                          { $multiply: [{ $toInt: { $arrayElemAt: ['$$timeParts', 1] } }, 60] },
+                          { $toInt: { $arrayElemAt: ['$$timeParts', 2] } }
+                        ]
+                      }
+                    }
+                  }
                 ]
               }
             }
           }
-        },
-        { $sort: { [sortField]: sortOrder as 1 | -1 } },
-        {
-          $facet: {
-            metadata: [{ $count: 'total' }],
-            data: [{ $skip: skip }, { $limit: limitNum }]
+        }
+      },
+
+      // 5. Son 10 projeyi ekle ve gereksiz alanları kaldır
+      {
+        $addFields: {
+          projects: {
+            $slice: [
+              {
+                $sortArray: {
+                  input: {
+                    $map: {
+                      input: '$projectsData',
+                      as: 'proj',
+                      in: {
+                        project: '$$proj.project',
+                        score: '$$proj.score',
+                        status: '$$proj.status',
+                        date: '$$proj.date'
+                      }
+                    }
+                  },
+                  sortBy: { date: -1 }
+                }
+              },
+              10
+            ]
           }
         }
-      ] as const;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await Student.aggregate(pipeline as any);
-      students = result[0].data;
-      total = result[0].metadata[0]?.total || 0;
-    }
-    // Diğer custom sortlar için eski yöntemi kullan (memory'de sıralama)
-    else {
-      const [fetchedStudents, count] = await Promise.all([
-        Student.find(filter)
-          .sort(needsMemorySort ? {} : sort)
-          .limit(needsMemorySort ? 0 : limitNum)
-          .skip(needsMemorySort ? 0 : skip)
-          .select('-__v')
-          .lean(),
-        Student.countDocuments(filter)
-      ]);
-      students = fetchedStudents;
-      total = count;
-    }
-
-    // Fetch projects for all students in one query
-    const studentLogins = students.map((s: Record<string, unknown>) => s.login as string);
-    
-    const [projects, patronages, locationStats] = await Promise.all([
-      Project.find({ login: { $in: studentLogins } })
-        .select('-__v')
-        .lean(),
-      Patronage.find({ login: { $in: studentLogins } })
-        .select('-__v')
-        .lean(),
-      LocationStats.find({ login: { $in: studentLogins } })
-        .select('-__v')
-        .lean()
-    ]);
-
-    // Group projects by login
-    const projectsByLogin = projects.reduce((acc: Record<string, Record<string, unknown>[]>, project: Record<string, unknown>) => {
-      const login = project.login as string;
-      if (!acc[login]) {
-        acc[login] = [];
+      },
+      {
+        $project: {
+          __v: 0,
+          projectsData: 0,
+          patronageData: 0,
+          locationData: 0
+        }
       }
-      acc[login].push(project);
-      return acc;
-    }, {});
+    ];
 
-    // Group patronages by login
-    const patronageByLogin = patronages.reduce((acc: Record<string, Record<string, unknown>>, patronage: Record<string, unknown>) => {
-      const login = patronage.login as string;
-      acc[login] = patronage;
-      return acc;
-    }, {});
+    // 6. Sıralama ekle
+    const sortStage: Record<string, 1 | -1> = {};
+    sortStage[actualSortField as string] = sortOrder as 1 | -1;
+    pipeline.push({ $sort: sortStage });
 
-    // Group location stats by login and calculate total duration
-    const locationStatsByLogin = locationStats.reduce((acc: Record<string, { totalDuration: number }>, loc: Record<string, unknown>) => {
-      const login = loc.login as string;
-      const months = loc.months as Map<string, { totalDuration: string }>;
-      
-      // Calculate total duration from all months
-      let totalSeconds = 0;
-      if (months) {
-        Object.values(months).forEach((month: { totalDuration: string }) => {
-          if (month && month.totalDuration) {
-            const [hours, minutes, seconds] = month.totalDuration.split(':').map(Number);
-            totalSeconds += hours * 3600 + minutes * 60 + seconds;
-          }
-        });
+    // 7. Facet ile pagination ve count
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        students: [
+          { $skip: skip },
+          { $limit: limitNum }
+        ]
       }
-      
-      acc[login] = { totalDuration: totalSeconds };
-      return acc;
-    }, {});
-
-    // Add projects and patronage to each student
-    let studentsWithData = students.map((student: Record<string, unknown>) => {
-      const studentProjects = projectsByLogin[student.login as string] || [];
-      // Cheat count: sadece status 'fail' ve score -42 olanlar
-      const cheats = studentProjects.filter((p: Record<string, unknown>) => 
-        p.status === 'fail' && p.score === -42
-      );
-      const hasCheats = cheats.length > 0;
-      // Sadece success olan projeleri say
-      const successProjects = studentProjects.filter((p: Record<string, unknown>) => 
-        p.status === 'success'
-      );
-      const locationData = locationStatsByLogin[student.login as string];
-      const patronage = patronageByLogin[student.login as string];
-      
-      return {
-        ...student,
-        projects: studentProjects,
-        project_count: successProjects.length, // Sadece başarılı projeler
-        has_cheats: hasCheats,
-        cheat_count: cheats.length,
-        patronage: patronage || null,
-        // Aggregation'dan geliyorsa zaten var, yoksa hesapla
-        godfather_count: student.godfatherCount !== undefined 
-          ? student.godfatherCount 
-          : (patronage?.godfathers ? (patronage.godfathers as unknown[]).length : 0),
-        children_count: student.childrenCount !== undefined 
-          ? student.childrenCount 
-          : (patronage?.children ? (patronage.children as unknown[]).length : 0),
-        log_time: locationData ? locationData.totalDuration : 0
-      };
     });
 
-    // Sort by custom fields if needed (sadece memory sort için)
-    if (needsMemorySort) {
-      studentsWithData.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-        let aValue, bValue;
-        
-        if (isCheatCountSort) {
-          aValue = a.cheat_count as number;
-          bValue = b.cheat_count as number;
-        } else if (isProjectCountSort) {
-          aValue = a.project_count as number;
-          bValue = b.project_count as number;
-        } else if (isLogTimeSort) {
-          aValue = a.log_time as number;
-          bValue = b.log_time as number;
-        } else {
-          return 0;
-        }
-        
-        return sortOrder === 1 ? aValue - bValue : bValue - aValue;
-      });
-      // Apply pagination after sorting
-      studentsWithData = studentsWithData.slice(skip, skip + limitNum);
-    }
+    const result = await Student.aggregate(pipeline);
+
+    const students = result[0].students || [];
+    const total = result[0].metadata[0]?.total || 0;
 
     return res.status(200).json({
-      students: studentsWithData,
+      students,
       pagination: {
         total,
         page: pageNum,
@@ -385,3 +421,4 @@ export default async function handler(
     });
   }
 }
+
