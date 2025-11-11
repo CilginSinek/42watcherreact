@@ -344,78 +344,44 @@ export default async function handler(
         $addFields: {
           feedbackCount: { $size: '$feedbackData' },
           avgRating: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $gt: [{ $size: '$feedbackData' }, 0] },
-                  then: {
-                    $avg: {
-                      $map: {
-                        input: '$feedbackData',
-                        as: 'fb',
-                        in: {
-                          $convert: {
-                            input: {
-                              $arrayElemAt: [
-                                { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
-                                0
-                              ]
-                            },
-                            to: 'double',
-                            onError: 0,
-                            onNull: 0
-                          }
-                        }
-                      }
-                    }
-                  },
-                  else: 0
+            $cond: {
+              if: { $gt: [{ $size: '$feedbackData' }, 0] },
+              then: {
+                $avg: {
+                  $map: {
+                    input: '$feedbackData',
+                    as: 'fb',
+                    in: '$$fb.rating'
+                  }
                 }
               },
-              0
-            ]
+              else: 0
+            }
           },
           evoPerformance: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $gt: [{ $size: '$feedbackData' }, 0] },
-                  then: {
-                    $add: [
+            $cond: {
+              if: { $gt: [{ $size: '$feedbackData' }, 0] },
+              then: {
+                $add: [
+                  {
+                    $multiply: [
                       {
-                        $multiply: [
-                          {
-                            $avg: {
-                              $map: {
-                                input: '$feedbackData',
-                                as: 'fb',
-                                in: {
-                                  $convert: {
-                                    input: {
-                                      $arrayElemAt: [
-                                        { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
-                                        0
-                                      ]
-                                    },
-                                    to: 'double',
-                                    onError: 0,
-                                    onNull: 0
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          10
-                        ]
+                        $avg: {
+                          $map: {
+                            input: '$feedbackData',
+                            as: 'fb',
+                            in: '$$fb.rating'
+                          }
+                        }
                       },
-                      { $size: '$feedbackData' }
+                      10
                     ]
                   },
-                  else: 0
-                }
+                  { $size: '$feedbackData' }
+                ]
               },
-              0
-            ]
+              else: 0
+            }
           }
         }
       });
@@ -581,30 +547,13 @@ export default async function handler(
             $cond: {
               if: { $gt: [{ $size: '$feedbackData' }, 0] },
               then: {
-                $ifNull: [
-                  {
-                    $avg: {
-                      $map: {
-                        input: '$feedbackData',
-                        as: 'fb',
-                        in: {
-                          $convert: {
-                            input: {
-                              $arrayElemAt: [
-                                { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
-                                0
-                              ]
-                            },
-                            to: 'double',
-                            onError: 0,
-                            onNull: 0
-                          }
-                        }
-                      }
-                    }
-                  },
-                  0
-                ]
+                $avg: {
+                  $map: {
+                    input: '$feedbackData',
+                    as: 'fb',
+                    in: '$$fb.rating'
+                  }
+                }
               },
               else: '$$REMOVE'
             }
@@ -614,108 +563,40 @@ export default async function handler(
               if: { $gt: [{ $size: '$feedbackData' }, 0] },
               then: {
                 nice: {
-                  $ifNull: [
-                    {
-                      $avg: {
-                        $map: {
-                          input: '$feedbackData',
-                          as: 'fb',
-                          in: {
-                            $convert: {
-                              input: {
-                                $arrayElemAt: [
-                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.nice', '0'] }, ' / '] },
-                                  0
-                                ]
-                              },
-                              to: 'double',
-                              onError: 0,
-                              onNull: 0
-                            }
-                          }
-                        }
-                      }
-                    },
-                    0
-                  ]
+                  $avg: {
+                    $map: {
+                      input: '$feedbackData',
+                      as: 'fb',
+                      in: '$$fb.ratingDetails.nice'
+                    }
+                  }
                 },
                 rigorous: {
-                  $ifNull: [
-                    {
-                      $avg: {
-                        $map: {
-                          input: '$feedbackData',
-                          as: 'fb',
-                          in: {
-                            $convert: {
-                              input: {
-                                $arrayElemAt: [
-                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.rigorous', '0'] }, ' / '] },
-                                  0
-                                ]
-                              },
-                              to: 'double',
-                              onError: 0,
-                              onNull: 0
-                            }
-                          }
-                        }
-                      }
-                    },
-                    0
-                  ]
+                  $avg: {
+                    $map: {
+                      input: '$feedbackData',
+                      as: 'fb',
+                      in: '$$fb.ratingDetails.rigorous'
+                    }
+                  }
                 },
                 interested: {
-                  $ifNull: [
-                    {
-                      $avg: {
-                        $map: {
-                          input: '$feedbackData',
-                          as: 'fb',
-                          in: {
-                            $convert: {
-                              input: {
-                                $arrayElemAt: [
-                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.interested', '0'] }, ' / '] },
-                                  0
-                                ]
-                              },
-                              to: 'double',
-                              onError: 0,
-                              onNull: 0
-                            }
-                          }
-                        }
-                      }
-                    },
-                    0
-                  ]
+                  $avg: {
+                    $map: {
+                      input: '$feedbackData',
+                      as: 'fb',
+                      in: '$$fb.ratingDetails.interested'
+                    }
+                  }
                 },
                 punctuality: {
-                  $ifNull: [
-                    {
-                      $avg: {
-                        $map: {
-                          input: '$feedbackData',
-                          as: 'fb',
-                          in: {
-                            $convert: {
-                              input: {
-                                $arrayElemAt: [
-                                  { $split: [{ $ifNull: ['$$fb.ratingDetails.punctuality', '0'] }, ' / '] },
-                                  0
-                                ]
-                              },
-                              to: 'double',
-                              onError: 0,
-                              onNull: 0
-                            }
-                          }
-                        }
-                      }
-                    },
-                    0
-                  ]
+                  $avg: {
+                    $map: {
+                      input: '$feedbackData',
+                      as: 'fb',
+                      in: '$$fb.ratingDetails.punctuality'
+                    }
+                  }
                 }
               },
               else: '$$REMOVE'
@@ -725,39 +606,22 @@ export default async function handler(
             $cond: {
               if: { $gt: [{ $size: '$feedbackData' }, 0] },
               then: {
-                $ifNull: [
+                $add: [
                   {
-                    $add: [
+                    $multiply: [
                       {
-                        $multiply: [
-                          {
-                            $avg: {
-                              $map: {
-                                input: '$feedbackData',
-                                as: 'fb',
-                                in: {
-                                  $convert: {
-                                    input: {
-                                      $arrayElemAt: [
-                                        { $split: [{ $ifNull: ['$$fb.rating', '0'] }, ' / '] },
-                                        0
-                                      ]
-                                    },
-                                    to: 'double',
-                                    onError: 0,
-                                    onNull: 0
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          10
-                        ]
+                        $avg: {
+                          $map: {
+                            input: '$feedbackData',
+                            as: 'fb',
+                            in: '$$fb.rating'
+                          }
+                        }
                       },
-                      { $size: '$feedbackData' }
+                      10
                     ]
                   },
-                  0
+                  { $size: '$feedbackData' }
                 ]
               },
               else: '$$REMOVE'
