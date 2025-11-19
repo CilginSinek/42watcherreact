@@ -204,7 +204,7 @@ function StudentDetail() {
     return `${Math.round(avg)}h`;
   };
 
-  // Projeleri isme göre grupla ve her grup içinde tarihe göre sırala
+  // Projeleri isme göre grupla
   const groupedProjects = student.projects?.reduce((acc, project) => {
     if (!acc[project.project]) {
       acc[project.project] = [];
@@ -219,6 +219,15 @@ function StudentDetail() {
       groupedProjects[key].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     });
   }
+
+  // Proje gruplarını en yeni projenin tarihine göre sırala
+  const sortedProjectEntries = groupedProjects 
+    ? Object.entries(groupedProjects).sort((a, b) => {
+        const dateA = new Date(a[1][0].date).getTime(); // İlk eleman en yeni
+        const dateB = new Date(b[1][0].date).getTime();
+        return dateB - dateA; // En yeni önce
+      })
+    : [];
 
   const toggleProjectExpansion = (projectName: string) => {
     setExpandedProjects(prev => {
@@ -439,8 +448,8 @@ function StudentDetail() {
             <div className="card">
               <h3 className="text-lg font-bold text-(--text-primary) mb-4">📋 Projects</h3>
               <div className="space-y-3">
-                {groupedProjects && Object.keys(groupedProjects).length > 0 ? (
-                  Object.entries(groupedProjects).map(([projectName, projectList]) => {
+                {sortedProjectEntries && sortedProjectEntries.length > 0 ? (
+                  sortedProjectEntries.map(([projectName, projectList]) => {
                     const isExpanded = expandedProjects.has(projectName);
                     const hasMultiple = projectList.length > 1;
                     const latestProject = projectList[0]; // İlk eleman en yeni (sorted by date desc)
