@@ -237,15 +237,18 @@ export default async function handler(
       }
     ]);
 
+    // Student objesini düzgün serialize et
+    const studentData = {
+      ...student,
+      projects,
+      feedbackCount,
+      avgRating,
+      logTimes,
+      attendanceDays
+    };
+
     return res.status(200).json({
-      student: {
-        ...student,
-        projects,
-        feedbackCount,
-        avgRating,
-        logTimes,
-        attendanceDays
-      }
+      student: studentData
     });
 
   } catch (error) {
