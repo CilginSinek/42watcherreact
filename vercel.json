@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/students/:login",
+      "destination": "/api/students/[login]"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },

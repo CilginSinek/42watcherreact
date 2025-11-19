@@ -88,8 +88,6 @@ function Dashboard() {
       const response = await axios.get(`/api/dashboard?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Dashboard API Response:', response.data);
-      console.log('Grade Distribution:', response.data.gradeDistribution);
       setData(response.data);
       setDashboardCache(campusId, response.data);
     } catch (error) {
@@ -306,16 +304,22 @@ function Dashboard() {
               <section>
                 <h3 className="section-title text-lg mb-4">⏱ Top Campus Time</h3>
                 <div className="grid grid-cols-1 gap-3">
-                  {data.topLocationStats.slice(0, 3).map((location, index) => (
-                    <StatCard
-                      key={location.login}
-                      rank={index + 1}
-                      icon="📍"
-                      name={location.student?.displayname || location.login}
-                      primaryStat={location.totalDuration}
-                      onClick={() => handleStudentClick(location.student)}
-                    />
-                  ))}
+                  {data.topLocationStats.slice(0, 3).map((location, index) => {
+                    // Duration'u HH:MM:SS'den HH:MM'e çevir
+                    const parts = location.totalDuration.split(':');
+                    const formattedDuration = `${parts[0]}:${parts[1]}`;
+                    
+                    return (
+                      <StatCard
+                        key={location.login}
+                        rank={index + 1}
+                        icon="📍"
+                        name={location.student?.displayname || location.login}
+                        primaryStat={formattedDuration}
+                        onClick={() => handleStudentClick(location.student)}
+                      />
+                    );
+                  })}
                 </div>
               </section>
             </div>

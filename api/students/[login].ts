@@ -113,14 +113,10 @@ export default async function handler(
       return res.status(400).json({ error: 'Login parameter is required' });
     }
 
-    console.log('Searching for student with login:', login);
-
     // Student bilgisini getir (case-insensitive search)
     const student = await Student.findOne({ 
       login: { $regex: new RegExp(`^${login}$`, 'i') } 
     }).lean();
-
-    console.log('Student found:', student ? 'Yes' : 'No');
 
     if (!student) {
       return res.status(404).json({ error: 'Student not found', login });

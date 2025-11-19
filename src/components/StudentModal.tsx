@@ -9,7 +9,9 @@ interface StudentModalProps {
     correction_point: number;
     wallet: number;
     project_count?: number;
-    monthlyLogTimes?: Array<{ date: string; login_at: string; logout_at: string; duration: string }>;
+    grade?: string;
+    level?: number;
+    projects?: Array<{ project: string; score: number; date: string; status: string }>;
   };
   onClose: () => void;
 }
@@ -76,16 +78,18 @@ export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
           </div>
         </div>
 
-        {student.monthlyLogTimes && student.monthlyLogTimes.length > 0 && (
+        {student.projects && student.projects.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-(--text-primary) font-semibold mb-3">Monthly Log Times</h3>
+            <h3 className="text-(--text-primary) font-semibold mb-3">Recent Projects</h3>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {student.monthlyLogTimes.map((log, idx) => (
+              {student.projects.slice(0, 5).map((project, idx) => (
                 <div key={idx} style={{ backgroundColor: 'var(--bg-input)' }} className="p-3 rounded-lg flex justify-between items-center text-sm">
-                  <span className="text-(--text-secondary)">{new Date(log.date).toLocaleDateString()}</span>
+                  <span className="text-(--text-secondary)">{project.project}</span>
                   <div className="text-(--text-primary) font-medium text-right">
-                    <div>{log.login_at} - {log.logout_at}</div>
-                    <div className="text-(--text-tertiary) text-xs">Duration: {log.duration}</div>
+                    <div className={project.score >= 80 ? 'text-green-500' : project.score >= 60 ? 'text-yellow-500' : 'text-red-500'}>
+                      {project.score}%
+                    </div>
+                    <div className="text-(--text-tertiary) text-xs">{new Date(project.date).toLocaleDateString()}</div>
                   </div>
                 </div>
               ))}
