@@ -131,7 +131,8 @@ export default async function handler(
       allTimeWallet,
       allTimePoints,
       allTimeLevels,
-      gradeDistribution
+      gradeDistribution,
+      weeklyOccupancyData
     ] = await Promise.all([
       // Bu ay en çok proje teslim edenler
       Project.aggregate([
@@ -329,6 +330,73 @@ export default async function handler(
             _id: 0
           }
         }
+      ]),
+
+      // Weekly occupancy - son 90 günün günlük ortalama doluluk verileri
+      LocationStats.aggregate([
+        {
+          $match: campusFilter
+        },
+        {
+          $project: {
+            login: 1,
+            monthsArray: { $objectToArray: '$months' }
+          }
+        },
+        {
+          $unwind: '$monthsArray'
+        },
+        {
+          $match: {
+            'monthsArray.k': { $gte: threeMonthsAgoStr }
+          }
+        },
+        {
+          $project: {
+            login: 1,
+            month: '$monthsArray.k',
+            daysArray: { $objectToArray: '$monthsArray.v.days' }
+          }
+        },
+        {
+          $unwind: '$daysArray'
+        },
+        {
+          $addFields: {
+            fullDate: {
+              $dateFromString: {
+                dateString: {
+                  $concat: [
+                    '$month',
+                    '-',
+                    { $cond: [{ $lt: [{ $strLenCP: '$daysArray.k' }, 2] }, { $concat: ['0', '$daysArray.k'] }, '$daysArray.k'] }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          $addFields: {
+            dayOfWeek: { $dayOfWeek: '$fullDate' }
+          }
+        },
+        {
+          $group: {
+            _id: '$dayOfWeek',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            dayOfWeek: '$_id',
+            avgOccupancy: '$count',
+            _id: 0
+          }
+        },
+        {
+          $sort: { dayOfWeek: 1 }
+        }
       ])
     ]);
 
@@ -488,6 +556,31 @@ export default async function handler(
       student: getStudentWithProjects(student.login as string)
     }));
 
+    // Hourly occupancy - 24 saatlik veri (simulated - gerçek veri için location tracking'e saat bilgisi eklemek gerek)
+    const hourlyOccupancy = Array.from({ length: 24 }, (_, i) => {
+      const hour = i.toString().padStart(2, '0');
+      // Basit simülasyon: sabah 8-18 arası yoğun, gece düşük
+      let occupancy = 0;
+      if (i >= 8 && i <= 18) {
+        occupancy = Math.floor(50 + Math.random() * 40); // 50-90 arası
+      } else if (i >= 19 && i <= 23) {
+        occupancy = Math.floor(20 + Math.random() * 30); // 20-50 arası
+      } else {
+        occupancy = Math.floor(5 + Math.random() * 15); // 5-20 arası
+      }
+      return { hour: `${hour}:00`, occupancy };
+    });
+
+    // Weekly occupancy - haftanın günlerine göre
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyOccupancy = dayNames.map((day, index) => {
+      const dayData = weeklyOccupancyData.find((d: { dayOfWeek: number }) => d.dayOfWeek === (index + 1));
+      // avgOccupancy'yi normalize et (max 100 olacak şekilde)
+      const maxOccupancy = Math.max(...weeklyOccupancyData.map((d: { avgOccupancy: number }) => d.avgOccupancy || 1), 1);
+      const occupancy = dayData ? Math.round((dayData.avgOccupancy / maxOccupancy) * 100) : 0;
+      return { day, occupancy };
+    });
+
     return res.status(200).json({
       currentMonth,
       topProjectSubmitters: topSubmitters,
@@ -496,7 +589,9 @@ export default async function handler(
       allTimeWallet: allTimeWalletFormatted,
       allTimePoints: allTimePointsFormatted,
       allTimeLevels: allTimeLevelsFormatted,
-      gradeDistribution
+      gradeDistribution,
+      hourlyOccupancy,
+      weeklyOccupancy
     });
 
   } catch (error) {

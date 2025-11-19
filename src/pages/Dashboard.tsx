@@ -39,6 +39,8 @@ interface DashboardData {
   allTimePoints: { login: string; correctionPoint: number; student: StudentFull | null }[];
   allTimeLevels: { login: string; level: number; student: StudentFull | null }[];
   gradeDistribution: { name: string; value: number }[];
+  hourlyOccupancy: { hour: string; occupancy: number }[];
+  weeklyOccupancy: { day: string; occupancy: number }[];
 }
 
 function Dashboard() {
@@ -49,31 +51,6 @@ function Dashboard() {
   const [loading, setLoading] = useState(!getDashboardCache(campusId));
   const [selectedStudent, setSelectedStudent] = useState<StudentFull | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const dailyOccupancy = [
-    { hour: '08:00', occupancy: 25 },
-    { hour: '09:00', occupancy: 45 },
-    { hour: '10:00', occupancy: 65 },
-    { hour: '11:00', occupancy: 72 },
-    { hour: '12:00', occupancy: 55 },
-    { hour: '13:00', occupancy: 48 },
-    { hour: '14:00', occupancy: 68 },
-    { hour: '15:00', occupancy: 78 },
-    { hour: '16:00', occupancy: 82 },
-    { hour: '17:00', occupancy: 75 },
-    { hour: '18:00', occupancy: 60 },
-    { hour: '19:00', occupancy: 35 }
-  ];
-
-  const weeklyOccupancy = [
-    { day: 'Mon', occupancy: 72 },
-    { day: 'Tue', occupancy: 78 },
-    { day: 'Wed', occupancy: 85 },
-    { day: 'Thu', occupancy: 82 },
-    { day: 'Fri', occupancy: 68 },
-    { day: 'Sat', occupancy: 35 },
-    { day: 'Sun', occupancy: 20 }
-  ];
 
   const COLORS = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -191,9 +168,9 @@ function Dashboard() {
             <h2 className="section-title text-2xl mb-6">📍 Campus Occupancy</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
               <div className="card">
-                <h3 className="text-lg font-bold mb-6">Hourly Occupancy</h3>
+                <h3 className="text-lg font-bold mb-6">Hourly Occupancy (24h)</h3>
                 <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={dailyOccupancy}>
+                  <BarChart data={data.hourlyOccupancy || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="hour" stroke="var(--text-tertiary)" angle={-45} textAnchor="end" height={80} />
                     <YAxis stroke="var(--text-tertiary)" />
@@ -209,7 +186,7 @@ function Dashboard() {
               <div className="card">
                 <h3 className="text-lg font-bold mb-6">Weekly Average</h3>
                 <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={weeklyOccupancy}>
+                  <BarChart data={data.weeklyOccupancy || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="day" stroke="var(--text-tertiary)" />
                     <YAxis stroke="var(--text-tertiary)" />
