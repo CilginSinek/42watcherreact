@@ -196,16 +196,18 @@ export default async function handler(
             
             let dayCount = 0;
             monthData.days.forEach((duration: string, day: string) => {
-              const date = new Date(day);
+              // monthKey: "2025-10", day: "15" -> "2025-10-15"
+              const fullDate = `${monthKey}-${String(day).padStart(2, '0')}`;
+              const date = new Date(fullDate);
               
-              console.log(`Checking day ${day}, date: ${date.toISOString()}, is after thirtyDaysAgo: ${date >= thirtyDaysAgo}`);
+              console.log(`Checking day ${day}, fullDate: ${fullDate}, is after thirtyDaysAgo: ${date >= thirtyDaysAgo}`);
               
               if (date >= thirtyDaysAgo) {
                 dayCount++;
                 // Duration HH:MM:SS formatından saniyeye çevir
                 const parts = duration.split(':');
                 const seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-                logTimes.push({ date: day, duration: seconds });
+                logTimes.push({ date: fullDate, duration: seconds });
               }
             });
             console.log(`Month ${monthKey} added ${dayCount} days to logTimes`);
