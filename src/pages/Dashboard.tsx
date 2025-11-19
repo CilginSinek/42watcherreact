@@ -3,7 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCache } from '../contexts/useCache';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import './Dashboard.css';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { StudentModal } from '../components/StudentModal';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import mockData from '../mockData.json';
 
 interface Project {
   project: string;
@@ -20,107 +23,26 @@ interface Patronage {
 interface StudentFull {
   login: string;
   displayname: string;
-  email: string;
-  image: {
-    link: string;
-    versions: {
-      large: string;
-      medium: string;
-      small: string;
-      micro: string;
-    };
-  };
+  image: { link: string };
   correction_point: number;
   wallet: number;
-  grade: string | null;
   projects?: Project[];
+  patronage?: Patronage | null;
   project_count?: number;
-  has_cheats?: boolean;
-  cheat_count?: number;
-  patronage?: Patronage | null;
-  feedbackCount?: number;
-  avgRating?: number;
-  avgRatingDetails?: {
-    nice: number;
-    rigorous: number;
-    interested: number;
-    punctuality: number;
-  };
-  evoPerformance?: number;
-}
-
-interface Student {
-  login: string;
-  displayname: string;
-  image: {
-    link: string;
-  };
-  correction_point: number;
-  wallet: number;
-  grade: string | null;
-  projects?: Project[];
-  patronage?: Patronage | null;
-  has_cheats?: boolean;
-  cheat_count?: number;
-  feedbackCount?: number;
-  avgRating?: number;
-  avgRatingDetails?: {
-    nice: number;
-    rigorous: number;
-    interested: number;
-    punctuality: number;
-  };
-  evoPerformance?: number;
-}
-
-interface TopSubmitter {
-  login: string;
-  projectCount: number;
-  totalScore: number;
-  projects: Project[];
-  student: Student | null;
-}
-
-interface TopLocation {
-  login: string;
-  totalDuration: string;
-  student: Student | null;
-}
-
-interface AllTimeProject {
-  login: string;
-  projectCount: number;
-  totalScore: number;
-  student: Student | null;
-}
-
-interface AllTimeWallet {
-  login: string;
-  wallet: number;
-  student: Student | null;
-}
-
-interface AllTimePoint {
-  login: string;
-  correctionPoint: number;
-  student: Student | null;
-}
-
-interface AllTimeLevel {
-  login: string;
-  level: number;
-  student: Student | null;
 }
 
 interface DashboardData {
   currentMonth: string;
-  topProjectSubmitters: TopSubmitter[];
-  topLocationStats: TopLocation[];
-  allTimeProjects: AllTimeProject[];
-  allTimeWallet: AllTimeWallet[];
-  allTimePoints: AllTimePoint[];
-  allTimeLevels: AllTimeLevel[];
+  topProjectSubmitters: { login: string; projectCount: number; totalScore: number; student: StudentFull | null }[];
+  topLocationStats: { login: string; totalDuration: string; student: StudentFull | null }[];
+  allTimeProjects: { login: string; projectCount: number; student: StudentFull | null }[];
+  allTimeWallet: { login: string; wallet: number; student: StudentFull | null }[];
+  allTimePoints: { login: string; correctionPoint: number; student: StudentFull | null }[];
+  allTimeLevels: { login: string; level: number; student: StudentFull | null }[];
+  gradeDistribution: { name: string; value: number }[];
 }
+
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 function Dashboard() {
   const { user, logout, token } = useAuth();
@@ -129,9 +51,46 @@ function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(getDashboardCache(campusId) as DashboardData | null);
   const [loading, setLoading] = useState(!getDashboardCache(campusId));
   const [selectedStudent, setSelectedStudent] = useState<StudentFull | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const dailyOccupancy = [
+    { hour: '08:00', occupancy: 25 },
+    { hour: '09:00', occupancy: 45 },
+    { hour: '10:00', occupancy: 65 },
+    { hour: '11:00', occupancy: 72 },
+    { hour: '12:00', occupancy: 55 },
+    { hour: '13:00', occupancy: 48 },
+    { hour: '14:00', occupancy: 68 },
+    { hour: '15:00', occupancy: 78 },
+    { hour: '16:00', occupancy: 82 },
+    { hour: '17:00', occupancy: 75 },
+    { hour: '18:00', occupancy: 60 },
+    { hour: '19:00', occupancy: 35 }
+  ];
+
+  const weeklyOccupancy = [
+    { day: 'Mon', occupancy: 72 },
+    { day: 'Tue', occupancy: 78 },
+    { day: 'Wed', occupancy: 85 },
+    { day: 'Thu', occupancy: 82 },
+    { day: 'Fri', occupancy: 68 },
+    { day: 'Sat', occupancy: 35 },
+    { day: 'Sun', occupancy: 20 }
+  ];
+
+  const COLORS = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const fetchDashboardData = async () => {
+    if (isLocalhost) {
+      setLoading(true);
+      setTimeout(() => {
+        setData(mockData.mockDashboard as DashboardData);
+        setDashboardCache(campusId, mockData.mockDashboard);
+        setLoading(false);
+      }, 500);
+      return;
+    }
+
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -140,9 +99,7 @@ function Dashboard() {
       }
       
       const response = await axios.get(`/api/dashboard?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setData(response.data);
       setDashboardCache(campusId, response.data);
@@ -164,505 +121,291 @@ function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, campusId]);
 
-  const handleCardClick = (login: string) => {
-    if (!data) return;
-    
-    // Dashboard verisinden student bilgisini bul
-    let studentData: Student | null = null;
-    
-    // Önce monthly stats'ta ara
-    const monthlySubmitter = data.topProjectSubmitters?.find(s => s.login === login);
-    if (monthlySubmitter?.student) {
-      studentData = monthlySubmitter.student;
-    }
-    
-    // Monthly location stats'ta ara
-    if (!studentData) {
-      const monthlyLocation = data.topLocationStats?.find(s => s.login === login);
-      if (monthlyLocation?.student) {
-        studentData = monthlyLocation.student;
-      }
-    }
-    
-    // All-time projects'te ara
-    if (!studentData) {
-      const allTimeProject = data.allTimeProjects?.find(s => s.login === login);
-      if (allTimeProject?.student) {
-        studentData = allTimeProject.student;
-      }
-    }
-    
-    // All-time wallet'ta ara
-    if (!studentData) {
-      const allTimeWalletItem = data.allTimeWallet?.find(s => s.login === login);
-      if (allTimeWalletItem?.student) {
-        studentData = allTimeWalletItem.student;
-      }
-    }
-    
-    // All-time points'te ara
-    if (!studentData) {
-      const allTimePointsItem = data.allTimePoints?.find(s => s.login === login);
-      if (allTimePointsItem?.student) {
-        studentData = allTimePointsItem.student;
-      }
-    }
-    
-    // All-time levels'ta ara
-    if (!studentData) {
-      const allTimeLevelsItem = data.allTimeLevels?.find(s => s.login === login);
-      if (allTimeLevelsItem?.student) {
-        studentData = allTimeLevelsItem.student;
-      }
-    }
-    
-    if (studentData) {
-      // Student tipini StudentFull'a dönüştür
-      setSelectedStudent({
-        ...studentData,
-        email: '', // Email gerekli değil modal'da ama interface için ekliyoruz
-        image: {
-          link: studentData.image.link,
-          versions: {
-            large: studentData.image.link,
-            medium: studentData.image.link,
-            small: studentData.image.link,
-            micro: studentData.image.link
-          }
-        }
-      } as StudentFull);
-      setShowModal(true);
-    }
+  const handleStudentClick = (student: StudentFull | null) => {
+    setSelectedStudent(student);
+    setIsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedStudent(null);
-  };
-
-  const formatDuration = (duration: string) => {
-    // duration format: "HH:MM:SS"
-    const [hours, minutes] = duration.split(':');
-    return `${hours}h ${minutes}m`;
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const StatCard = ({ rank, icon, name, primaryStat, secondaryStat, onClick }: any) => (
+    <div
+      onClick={onClick}
+      className="card-hover group cursor-pointer"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-(--primary) text-white font-bold text-sm">
+          {rank}
+        </div>
+        <span className="text-2xl">{icon}</span>
+      </div>
+      {name && <p className="text-(--text-tertiary) text-sm mb-2">{name}</p>}
+      <div className="space-y-1">
+        {primaryStat && <p className="text-lg font-bold text-(--primary)">{primaryStat}</p>}
+        {secondaryStat && <p className="text-sm text-(--text-secondary)">{secondaryStat}</p>}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="header-content">
-          <h1><a href="/dashboard" className="header-link">42 Watcher</a></h1>
-          <nav className="nav-links">
-            <Link to="/dashboard" className="nav-link active">Dashboard</Link>
-            <Link to="/students" className="nav-link">Students</Link>
-          </nav>
-          <div className="filter-container">
-            <select 
-              value={campusId} 
-              onChange={(e) => setCampusId(e.target.value)}
-              className="campus-filter"
-            >
-              <option value="all">All Campuses</option>
-              <option value="50">Kocaeli</option>
-              <option value="49">Istanbul</option>
-            </select>
-          </div>
-          {user && (
-            <div className="user-info">
-              <img src={user.image.link} alt={user.login} />
-              <span>{user.login}</span>
-              <button onClick={logout} className="logout-btn">Logout</button>
+    <div style={{ backgroundColor: 'var(--bg-primary)' }} className="min-h-screen transition-colors duration-300">
+      {/* Header */}
+      <header style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-secondary)' }} className="border-b backdrop-blur-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <Link to="/dashboard" className="text-xl font-bold text-(--text-primary) hover:text-(--primary) transition">
+                42 Watcher
+              </Link>
+              <nav className="flex items-center gap-6 ml-8">
+                <Link to="/dashboard" className="text-(--primary) border-b-2 border-(--primary) pb-1">Dashboard</Link>
+                <Link to="/students" className="text-(--text-secondary) hover:text-(--text-primary) transition pb-1">Students</Link>
+              </nav>
             </div>
-          )}
+
+            <div className="flex items-center gap-4">
+              <select
+                value={campusId}
+                onChange={(e) => setCampusId(e.target.value)}
+                className="input py-2 text-sm"
+              >
+                <option value="all">All Campuses</option>
+                <option value="50">Kocaeli</option>
+                <option value="49">Istanbul</option>
+              </select>
+
+              <ThemeToggle />
+
+              {user && (
+                <div className="flex items-center gap-3">
+                  <img src={user.image.link || "/placeholder.svg"} alt={user.login} className="w-8 h-8 rounded-full object-cover" />
+                  <span className="text-(--text-secondary) text-sm">{user.login}</span>
+                  <button
+                    onClick={logout}
+                    className="btn-secondary py-1 px-3 text-sm"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="dashboard-content">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {loading ? (
-          <div className="loading">Loading dashboard...</div>
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-10 h-10 rounded-full border-2 border-(--primary) border-t-transparent animate-spin mb-3"></div>
+            <p className="text-(--text-secondary)">Loading dashboard...</p>
+          </div>
         ) : data ? (
           <>
-            <h2 className="month-title">📊 {data.currentMonth} Statistics</h2>
-            
-            <div className="stats-grid">
-              {/* Top Project Submitters - This Month */}
-              <section className="stats-section">
-                <h3 className="section-title">🏆 Top Project Submitters (This Month)</h3>
-                <div className="top-list">
-                  {data.topProjectSubmitters.map((submitter, index) => (
-                    <div 
-                      key={submitter.login} 
-                      className={`top-card rank-${index + 1}`}
-                      onClick={() => handleCardClick(submitter.login)}
+            <h2 className="section-title text-2xl mb-6">📍 Campus Occupancy</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+              <div className="card">
+                <h3 className="text-lg font-bold mb-6">Hourly Occupancy</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={dailyOccupancy}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="hour" stroke="var(--text-tertiary)" angle={-45} textAnchor="end" height={80} />
+                    <YAxis stroke="var(--text-tertiary)" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                      labelStyle={{ color: 'var(--text-primary)' }}
+                    />
+                    <Bar dataKey="occupancy" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="card">
+                <h3 className="text-lg font-bold mb-6">Weekly Average</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={weeklyOccupancy}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="day" stroke="var(--text-tertiary)" />
+                    <YAxis stroke="var(--text-tertiary)" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                      labelStyle={{ color: 'var(--text-primary)' }}
+                    />
+                    <Bar dataKey="occupancy" fill="#06b6d4" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+              <div className="card">
+                <h3 className="text-lg font-bold mb-6">Performance Trend</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={[
+                    { name: 'Week 1', value: 400 },
+                    { name: 'Week 2', value: 450 },
+                    { name: 'Week 3', value: 380 },
+                    { name: 'Week 4', value: 520 }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="name" stroke="var(--text-tertiary)" />
+                    <YAxis stroke="var(--text-tertiary)" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                      labelStyle={{ color: 'var(--text-primary)' }}
+                    />
+                    <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="card">
+                <h3 className="text-lg font-bold mb-6">Grade Distribution</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={data.gradeDistribution || []}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
                     >
-                      <div className="rank-badge">{index + 1}</div>
-                      {submitter.student && (
-                        <img 
-                          src={submitter.student.image.link} 
-                          alt={submitter.student.login}
-                          className="student-avatar"
-                        />
-                      )}
-                      <div className="student-details">
-                        <h4>{submitter.student?.displayname || submitter.login}</h4>
-                        <div className="student-stats">
-                          <span className="stat-item">
-                            📦 {submitter.projectCount} projects
-                          </span>
-                          <span className="stat-item">
-                            ⭐ {submitter.totalScore} total score
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                      {(data.gradeDistribution || []).map((_entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                      labelStyle={{ color: 'var(--text-primary)' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Monthly Stats */}
+            <h2 className="section-title text-2xl mb-6">📊 {data.currentMonth} Statistics</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+              <section>
+                <h3 className="section-title text-lg mb-4">🏆 Top Project Submitters</h3>
+                <div className="grid grid-cols-1 gap-3">
+                  {data.topProjectSubmitters.slice(0, 3).map((submitter, index) => (
+                    <StatCard
+                      key={submitter.login}
+                      rank={index + 1}
+                      icon="📦"
+                      name={submitter.student?.displayname || submitter.login}
+                      primaryStat={`${submitter.projectCount} projects`}
+                      secondaryStat={`${submitter.totalScore} total score`}
+                      onClick={() => handleStudentClick(submitter.student)}
+                    />
                   ))}
                 </div>
               </section>
 
-              {/* Top Location Stats - Last 3 Months */}
-              <section className="stats-section">
-                <h3 className="section-title">⏱️ Top Campus Time (Last 3 Months)</h3>
-                <div className="top-list">
-                  {data.topLocationStats.map((location, index) => (
-                    <div 
-                      key={location.login} 
-                      className={`top-card rank-${index + 1}`}
-                      onClick={() => handleCardClick(location.login)}
-                    >
-                      <div className="rank-badge">{index + 1}</div>
-                      {location.student && (
-                        <img 
-                          src={location.student.image.link} 
-                          alt={location.student.login}
-                          className="student-avatar"
-                        />
-                      )}
-                      <div className="student-details">
-                        <h4>{location.student?.displayname || location.login}</h4>
-                        <div className="student-stats">
-                          <span className="stat-item time-stat">
-                            ⏰ {formatDuration(location.totalDuration)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+              <section>
+                <h3 className="section-title text-lg mb-4">⏱ Top Campus Time</h3>
+                <div className="grid grid-cols-1 gap-3">
+                  {data.topLocationStats.slice(0, 3).map((location, index) => (
+                    <StatCard
+                      key={location.login}
+                      rank={index + 1}
+                      icon="📍"
+                      name={location.student?.displayname || location.login}
+                      primaryStat={location.totalDuration}
+                      onClick={() => handleStudentClick(location.student)}
+                    />
                   ))}
                 </div>
               </section>
             </div>
 
             {/* All Time Rankings */}
-            <h2 className="month-title">🌟 All Time Rankings</h2>
-            <div className="stats-grid stats-grid-three">
-              {/* All Time Projects */}
-              <section className="stats-section">
-                <h3 className="section-title">📦 Most Projects</h3>
-                <div className="top-list">
-                  {data.allTimeProjects?.map((ranking, index) => (
-                    <div 
-                      key={ranking.login} 
-                      className={`top-card rank-${index + 1}`}
-                      onClick={() => handleCardClick(ranking.login)}
-                    >
-                      <div className="rank-badge">{index + 1}</div>
-                      {ranking.student && (
-                        <img 
-                          src={ranking.student.image.link} 
-                          alt={ranking.student.login}
-                          className="student-avatar"
-                        />
-                      )}
-                      <div className="student-details">
-                        <h4>{ranking.student?.displayname || ranking.login}</h4>
-                        <div className="student-stats">
-                          <span className="stat-item">📦 {ranking.projectCount} projects</span>
-                          <span className="stat-item">⭐ {ranking.totalScore} total score</span>
-                        </div>
-                      </div>
-                    </div>
+            <h2 className="section-title text-2xl mb-6">🌟 All Time Rankings</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <section>
+                <h3 className="section-title text-base mb-3">📦 Most Projects</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {data.allTimeProjects?.slice(0, 3).map((ranking, index) => (
+                    <StatCard
+                      key={ranking.login}
+                      rank={index + 1}
+                      icon="📦"
+                      primaryStat={`${ranking.projectCount}`}
+                      secondaryStat={ranking.student?.displayname || ranking.login}
+                      onClick={() => handleStudentClick(ranking.student)}
+                    />
                   ))}
                 </div>
               </section>
 
-              {/* All Time Wallet */}
-              <section className="stats-section">
-                <h3 className="section-title">💰 Richest Wallets</h3>
-                <div className="top-list">
-                  {data.allTimeWallet?.map((ranking, index) => (
-                    <div 
-                      key={ranking.login} 
-                      className={`top-card rank-${index + 1}`}
-                      onClick={() => handleCardClick(ranking.login)}
-                    >
-                      <div className="rank-badge">{index + 1}</div>
-                      {ranking.student && (
-                        <img 
-                          src={ranking.student.image.link} 
-                          alt={ranking.student.login}
-                          className="student-avatar"
-                        />
-                      )}
-                      <div className="student-details">
-                        <h4>{ranking.student?.displayname || ranking.login}</h4>
-                        <div className="student-stats">
-                          <span className="stat-item">💰 {ranking.wallet}₳</span>
-                        </div>
-                      </div>
-                    </div>
+              <section>
+                <h3 className="section-title text-base mb-3">💰 Richest Wallets</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {data.allTimeWallet?.slice(0, 3).map((ranking, index) => (
+                    <StatCard
+                      key={ranking.login}
+                      rank={index + 1}
+                      icon="💰"
+                      primaryStat={`${ranking.wallet}₳`}
+                      secondaryStat={ranking.student?.displayname || ranking.login}
+                      onClick={() => handleStudentClick(ranking.student)}
+                    />
                   ))}
                 </div>
               </section>
 
-              {/* All Time Points */}
-              <section className="stats-section">
-                <h3 className="section-title">⭐ Most Evaluation Points</h3>
-                <div className="top-list">
-                  {data.allTimePoints?.map((ranking, index) => (
-                    <div 
-                      key={ranking.login} 
-                      className={`top-card rank-${index + 1}`}
-                      onClick={() => handleCardClick(ranking.login)}
-                    >
-                      <div className="rank-badge">{index + 1}</div>
-                      {ranking.student && (
-                        <img 
-                          src={ranking.student.image.link} 
-                          alt={ranking.student.login}
-                          className="student-avatar"
-                        />
-                      )}
-                      <div className="student-details">
-                        <h4>{ranking.student?.displayname || ranking.login}</h4>
-                        <div className="student-stats">
-                          <span className="stat-item">🎯 {ranking.correctionPoint} points</span>
-                        </div>
-                      </div>
-                    </div>
+              <section>
+                <h3 className="section-title text-base mb-3">⭐ Evaluation Points</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {data.allTimePoints?.slice(0, 3).map((ranking, index) => (
+                    <StatCard
+                      key={ranking.login}
+                      rank={index + 1}
+                      icon="⭐"
+                      primaryStat={`${ranking.correctionPoint}`}
+                      secondaryStat={ranking.student?.displayname || ranking.login}
+                      onClick={() => handleStudentClick(ranking.student)}
+                    />
                   ))}
                 </div>
               </section>
 
-              {/* All Time Levels */}
-              <section className="stats-section">
-                <h3 className="section-title">🎓 Highest Levels</h3>
-                <div className="top-list">
-                  {data.allTimeLevels?.map((ranking, index) => (
-                    <div 
-                      key={ranking.login} 
-                      className={`top-card rank-${index + 1}`}
-                      onClick={() => handleCardClick(ranking.login)}
-                    >
-                      <div className="rank-badge">{index + 1}</div>
-                      {ranking.student && (
-                        <img 
-                          src={ranking.student.image.link} 
-                          alt={ranking.student.login}
-                          className="student-avatar"
-                        />
-                      )}
-                      <div className="student-details">
-                        <h4>{ranking.student?.displayname || ranking.login}</h4>
-                        <div className="student-stats">
-                          <span className="stat-item">🎓 Level {ranking.level?.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
+              <section>
+                <h3 className="section-title text-base mb-3">🎓 Highest Levels</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {data.allTimeLevels?.slice(0, 3).map((ranking, index) => (
+                    <StatCard
+                      key={ranking.login}
+                      rank={index + 1}
+                      icon="🎓"
+                      primaryStat={`${ranking.level?.toFixed(2)}`}
+                      secondaryStat={ranking.student?.displayname || ranking.login}
+                      onClick={() => handleStudentClick(ranking.student)}
+                    />
                   ))}
                 </div>
               </section>
             </div>
           </>
         ) : (
-          <div className="error">Failed to load dashboard data</div>
-        )}
-      </div>
-
-      {/* Modal */}
-      {showModal && selectedStudent && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                <a 
-                  href={`https://profile.intra.42.fr/users/${selectedStudent.login}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#667eea', textDecoration: 'none' }}
-                >
-                  {selectedStudent.displayname || selectedStudent.login}
-                </a>
-              </h2>
-              <button className="close-btn" onClick={closeModal} aria-label="Close modal"></button>
-            </div>
-
-            {/* Evaluation Performance Section */}
-            {selectedStudent.feedbackCount !== undefined && selectedStudent.feedbackCount > 0 && (
-              <div className="patronage-section">
-                <h3 style={{ color: '#10b981', marginBottom: '1rem' }}>
-                  ⭐ Evaluation Performance
-                </h3>
-                <div className="patronage-grid-two">
-                  <div className="patronage-box">
-                    <h4>📊 Overall Stats</h4>
-                    <div className="stat-list">
-                      <div className="stat-row">
-                        <span className="stat-label">Total Feedbacks:</span>
-                        <span className="stat-value">{selectedStudent.feedbackCount}</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Average Rating:</span>
-                        <span className="stat-value">{(selectedStudent.avgRating ?? 0).toFixed(2)} / 5.00</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Evo Performance:</span>
-                        <span className="stat-value">{(selectedStudent.evoPerformance ?? 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="patronage-box">
-                    <h4>⭐ Rating Details</h4>
-                    <div className="stat-list">
-                      <div className="stat-row">
-                        <span className="stat-label">😊 Nice:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.nice ?? 0).toFixed(2)} / 4</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">🎯 Rigorous:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.rigorous ?? 0).toFixed(2)} / 4</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">🤔 Interested:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.interested ?? 0).toFixed(2)} / 4</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">⏰ Punctuality:</span>
-                        <span className="stat-value">{(selectedStudent.avgRatingDetails?.punctuality ?? 0).toFixed(2)} / 4</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Patronage Section */}
-            {selectedStudent.patronage && (
-              <div className="patronage-section">
-                <h3 style={{ color: '#667eea', marginBottom: '1rem' }}>
-                  👥 Patronage
-                </h3>
-                <div className="patronage-grid-two">
-                  <div className="patronage-box">
-                    <h4>🎓 Godfathers ({selectedStudent.patronage.godfathers?.length || 0})</h4>
-                    <div className="login-list">
-                      {selectedStudent.patronage.godfathers && selectedStudent.patronage.godfathers.length > 0 ? (
-                        selectedStudent.patronage.godfathers.map((gf, idx) => (
-                          <a
-                            key={idx}
-                            href={`https://profile.intra.42.fr/users/${gf.login}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="login-badge"
-                          >
-                            @{gf.login}
-                          </a>
-                        ))
-                      ) : (
-                        <span className="no-data">No godfathers</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="patronage-box">
-                    <h4>👶 Children ({selectedStudent.patronage.children?.length || 0})</h4>
-                    <div className="login-list">
-                      {selectedStudent.patronage.children && selectedStudent.patronage.children.length > 0 ? (
-                        selectedStudent.patronage.children.map((child, idx) => (
-                          <a
-                            key={idx}
-                            href={`https://profile.intra.42.fr/users/${child.login}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="login-badge"
-                          >
-                            @{child.login}
-                          </a>
-                        ))
-                      ) : (
-                        <span className="no-data">No children</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Projects Section */}
-            {selectedStudent.projects && selectedStudent.projects.length > 0 ? (
-              <div className="project-sections">
-                {/* Cheating Records */}
-                {selectedStudent.has_cheats && selectedStudent.cheat_count && selectedStudent.cheat_count > 0 && (
-                  <div className="cheat-list">
-                    <h3 style={{ color: '#ef4444', marginBottom: '1rem' }}>
-                      ⚠️ Cheating Records ({selectedStudent.cheat_count})
-                    </h3>
-                    {selectedStudent.projects
-                      .filter((p) => p.score === -42 && p.status === 'fail')
-                      .map((cheat, index) => (
-                        <div key={index} className="cheat-item">
-                          <h4>{cheat.project}</h4>
-                          <p><strong>Score:</strong> {cheat.score}</p>
-                          <p><strong>Status:</strong> {cheat.status}</p>
-                          <p><strong>Date:</strong> {new Date(cheat.date).toLocaleDateString()}</p>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {/* Regular Projects - Sadece başarılı olanlar */}
-                {selectedStudent.projects.filter((p) => p.status === 'success').length > 0 && (
-                  <div className="project-list">
-                    <h3 style={{ color: '#667eea', marginBottom: '1rem' }}>
-                      📦 Completed Projects ({selectedStudent.projects.filter((p) => p.status === 'success').length})
-                    </h3>
-                    <div className="project-grid">
-                      {selectedStudent.projects
-                        .filter((p) => p.status === 'success')
-                        .slice(0, 10)
-                        .map((project, index) => (
-                          <div key={index} className={`project-item status-${project.status}`}>
-                            <h4>{project.project}</h4>
-                            <div className="project-details">
-                              <span className={`score ${
-                                project.status === 'success' 
-                                  ? 'high' 
-                                  : project.status === 'fail' 
-                                    ? 'low' 
-                                    : 'mid'
-                              }`}>
-                                ⭐ {project.score}
-                              </span>
-                              <span className="date">
-                                📅 {new Date(project.date).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="no-projects">No projects found</div>
-            )}
+          <div className="text-center py-12">
+            <p className="text-red-400">Failed to load dashboard data</p>
           </div>
-        </div>
-      )}
+        )}
+      </main>
 
-      <footer className="footer">
-        <div className="footer-content">
-          <a href="https://sinek.dev" target="_blank" rel="noopener noreferrer">sinek.dev</a>
-          <span>•</span>
-          <a href="https://github.com/CilginSinek" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <span>•</span>
-          <a href="https://github.com/CilginSinek/42watcherreact" target="_blank" rel="noopener noreferrer">Repository</a>
+      <StudentModal isOpen={isModalOpen} student={selectedStudent as StudentFull} onClose={() => setIsModalOpen(false)} />
+
+      {/* Footer */}
+      <footer style={{ borderColor: 'var(--border)' }} className="border-t mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-6 text-center text-(--text-tertiary) text-sm">
+          <p>Made with by <a href="https://sinek.dev" target="_blank" rel="noopener noreferrer" className="text-(--primary) hover:opacity-80">sinek.dev</a></p>
         </div>
       </footer>
     </div>

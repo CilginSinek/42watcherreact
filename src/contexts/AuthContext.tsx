@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
+import mockData from '../mockData.json';
 
 interface User {
   id: number;
@@ -35,13 +36,23 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Localhost'ta mock user kullan
+    if (isLocalhost) {
+      setUser(mockData.mockUser as User);
+      setToken('mock-token-for-localhost');
+      setLoading(false);
+      return;
+    }
+
+    // Production'da normal akış
     const storedToken = localStorage.getItem('42_access_token');
     if (storedToken) {
       setToken(storedToken);
@@ -52,6 +63,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const fetchUserData = async (token: string) => {
+    // Localhost'ta API çağrısı yapma
+    if (isLocalhost) {
+      setUser(mockData.mockUser as User);
+      setLoading(false);
+      return;
+    }
+
+    // Production'da API çağrısı
     try {
       const response = await axios.get('/api/user/me', {
         headers: {

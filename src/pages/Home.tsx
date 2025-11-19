@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import './Home.css';
+import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface Student {
   id: number;
@@ -21,14 +23,12 @@ interface Student {
   wallet: number;
   location: string | null;
   blackholed: boolean | null;
-  next_milestone: string | null;
   'active?': boolean;
   'alumni?': boolean;
   is_piscine: boolean;
   is_trans: boolean;
-  freeze: boolean | null;
-  sinker: boolean | null;
   cheats?: Cheat[];
+  locationHistory?: { date: string; count: number }[];
 }
 
 interface Cheat {
@@ -46,39 +46,37 @@ interface PaginationInfo {
 
 function Home() {
   const { user, logout, token } = useAuth();
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
-  const [campusId, setCampusId] = useState('all');
-  const [sortBy, setSortBy] = useState('login');
-  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [showModal, setShowModal] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo>({
     total: 0,
     page: 1,
     limit: 50,
     totalPages: 0
   });
+  const [stats] = useState([
+    { name: 'Mon', value: 45 },
+    { name: 'Tue', value: 52 },
+    { name: 'Wed', value: 48 },
+    { name: 'Thu', value: 61 },
+    { name: 'Fri', value: 55 },
+    { name: 'Sat', value: 67 },
+    { name: 'Sun', value: 48 }
+  ]);
 
   const fetchStudents = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        sortBy,
-        order,
-        ...(search && { search }),
-        ...(status !== 'all' && { status }),
-        ...(campusId !== 'all' && { campusId })
+        limit: '12',
+        ...(search && { search })
       });
 
       const response = await axios.get(`/api/students?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setStudents(response.data.students);
       setPagination(response.data.pagination);
@@ -92,288 +90,207 @@ function Home() {
   useEffect(() => {
     fetchStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, sortBy, order, status, campusId]);
+  }, [pagination.page]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pagination.page !== 1) {
-      setPagination(prev => ({ ...prev, page: 1 }));
-    } else {
-      fetchStudents();
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearch('');
-    // Force refetch after clearing search
-    setTimeout(() => {
-      if (pagination.page !== 1) {
-        setPagination(prev => ({ ...prev, page: 1 }));
-      } else {
-        fetchStudents();
-      }
-    }, 0);
-  };
-
-  const handleFilterChange = (setter: (value: string) => void, value: string) => {
-    setter(value);
-    if (pagination.page !== 1) {
-      setPagination(prev => ({ ...prev, page: 1 }));
-    }
+    setPagination(prev => ({ ...prev, page: 1 }));
+    fetchStudents();
   };
 
   const getStatusBadge = (student: Student) => {
-    if (student.blackholed) return <span className="badge blackhole">⚫ Blackhole</span>;
-    if (student.is_piscine) return <span className="badge piscine">🏊 Piscine</span>;
-    if (student.sinker) return <span className="badge sinker">⚓ Sinker</span>;
-    if (student.freeze) return <span className="badge freeze">❄️ Freeze</span>;
-    if (student.is_trans) return <span className="badge transfer">🔄 Transcender</span>;
-    if (student['alumni?']) return <span className="badge alumni">🎓 Alumni</span>;
-    if (student['active?']) return <span className="badge active">✅ Active</span>;
-    return <span className="badge inactive">❌ Inactive</span>;
+    if (student.blackholed) return <span className="badge badge-error text-xs">Blackhole</span>;
+    if (student.is_piscine) return <span className="badge badge-warning text-xs">Piscine</span>;
+    if (student.is_trans) return <span className="badge badge-primary text-xs">Transcender</span>;
+    if (student['alumni?']) return <span className="badge badge-success text-xs">Alumni</span>;
+    if (student['active?']) return <span className="badge badge-success text-xs">Active</span>;
+    return <span className="badge badge-secondary text-xs">Inactive</span>;
   };
 
   const handleStudentClick = (student: Student) => {
-    // Cheats are already included in student data from API
-    setSelectedStudent(student);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedStudent(null);
+    navigate(`/students/${student.login}`);
   };
 
   return (
-    <div className="home-container">
-      <div className="home-content">
-        <header className="home-header">
-          <div className="header-content">
-            <h1><a href="/" className="header-link">42 Watcher</a></h1>
+    <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen transition-colors duration-300">
+      {/* Header */}
+      <header style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-secondary)' }} className="sticky top-0 z-40 border-b backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 py-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold bg-linear-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent">
+              42 Watcher
+            </h1>
             {user && (
-              <div className="user-info">
-                <img src={user.image.link} alt={user.login} />
-                <span>{user.login}</span>
-                <button onClick={logout} className="logout-btn">Logout</button>
-              </div>
-            )}
-          </div>
-        </header>
-
-      <div className="filters-section">
-        <form onSubmit={handleSearch} className="search-form">
-          <div className="search-row">
-            <div className="search-input-wrapper">
-              <input
-                type="text"
-                placeholder="Search by login, name, or email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="search-input"
-              />
-              {search && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <img src={user.image.link || "/placeholder.svg"} alt={user.login} className="h-10 w-10 rounded-full object-cover border border-(--primary)" />
+                  <span className="text-sm font-medium">{user.login}</span>
+                </div>
+                <ThemeToggle />
                 <button 
-                  type="button" 
-                  onClick={handleClearSearch}
-                  className="clear-btn"
-                  aria-label="Clear search"
+                  onClick={logout}
+                  className="btn btn-secondary py-2 px-3 text-sm"
                 >
-                  ✕
+                  Logout
                 </button>
-              )}
-            </div>
-            <button type="submit" className="search-btn">🔍 Search</button>
-          </div>
-          
-          <div className="filter-controls">
-            <select value={campusId} onChange={(e) => handleFilterChange(setCampusId, e.target.value)} className="filter-select">
-              <option value="all">All Campuses</option>
-              <option value="49">Istanbul</option>
-              <option value="50">Kocaeli</option>
-            </select>
-
-            <select value={status} onChange={(e) => handleFilterChange(setStatus, e.target.value)} className="filter-select">
-              <option value="all">All Students</option>
-              <option value="active">Active</option>
-              <option value="blackhole">Blackhole</option>
-              <option value="piscine">Piscine</option>
-              <option value="transfer">Transcender</option>
-              <option value="alumni">Alumni</option>
-              <option value="sinker">Sinker</option>
-              <option value="freeze">Freeze</option>
-              <option value="cheaters">Cheaters</option>
-            </select>
-
-            <select value={sortBy} onChange={(e) => handleFilterChange(setSortBy, e.target.value)} className="filter-select">
-              <option value="login">Login</option>
-              <option value="correction_point">Correction Points</option>
-              <option value="wallet">Wallet</option>
-              <option value="created_at">Created Date</option>
-              <option value="cheat_count">Cheat Count</option>
-            </select>
-
-            <button 
-              onClick={() => {
-                setOrder(order === 'asc' ? 'desc' : 'asc');
-                if (pagination.page !== 1) {
-                  setPagination(prev => ({ ...prev, page: 1 }));
-                }
-              }}
-              className="order-btn"
-              type="button"
-            >
-              {order === 'asc' ? '↑ Ascending' : '↓ Descending'}
-            </button>
-          </div>
-        </form>
-
-        <div className="stats">
-          <span>Total: {pagination.total} students</span>
-          <span>Page {pagination.page} of {pagination.totalPages}</span>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="loading">Loading students...</div>
-      ) : (
-        <>
-          <div className="students-grid">
-            {students.map((student) => (
-              <div 
-                key={student.id} 
-                className="student-card"
-                onClick={() => handleStudentClick(student)}
-              >
-                <div className="student-card-header">
-                  <img src={student.image.versions.medium} alt={student.login} className="student-avatar" />
-                  {student.cheats && student.cheats.length > 0 && (
-                    <span className="badge cheater">🚨 {student.cheats.length}</span>
-                  )}
-                </div>
-                <div className="student-info">
-                  <h3>
-                    <a 
-                      href={`https://profile.intra.42.fr/users/${student.login}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {student.displayname || student.login}
-                    </a>
-                  </h3>
-                  <p className="login">@{student.login}</p>
-                  {getStatusBadge(student)}
-                  <div className="student-stats">
-                    <span>⭐ {student.correction_point}</span>
-                    <span>💰 {student.wallet}₳</span>
-                    {student.cheats && student.cheats.length > 0 && (
-                      <span className="cheat-count">🚨 {student.cheats.length}</span>
-                    )}
-                    {student.next_milestone && (
-                      <span>🎯 {student.next_milestone}</span>
-                    )}
-                  </div>
-                  {student.location && (
-                    <p className="location">📍 {student.location}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {students.length === 0 && !loading && (
-            <div className="no-results">
-              <div className="no-results-icon">🔍</div>
-              <div className="no-results-text">Sonuç Bulunamadı</div>
-              <div className="no-results-subtext">
-                Arama kriterlerinize uygun öğrenci bulunamadı. Lütfen filtreleri değiştirip tekrar deneyin.
-              </div>
-            </div>
-          )}
-
-          {students.length > 0 && (
-            <div className="pagination">
-              <button
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                disabled={pagination.page === 1}
-                className="pagination-btn"
-              >
-                ← Previous
-              </button>
-              <span className="page-info">
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                disabled={pagination.page >= pagination.totalPages}
-                className="pagination-btn"
-              >
-                Next →
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {showModal && selectedStudent && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                <a 
-                  href={`https://profile.intra.42.fr/users/${selectedStudent.login}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#667eea', textDecoration: 'none' }}
-                >
-                  {selectedStudent.displayname || selectedStudent.login}
-                </a>
-              </h2>
-              <button className="close-btn" onClick={closeModal} aria-label="Close modal"></button>
-            </div>
-
-            {selectedStudent.cheats === undefined ? (
-              <div className="loading">Loading cheats...</div>
-            ) : selectedStudent.cheats.length === 0 ? (
-              <div className="no-cheats">
-                No cheating records found
-              </div>
-            ) : (
-              <div className="cheat-list">
-                <h3 style={{ color: '#ef4444', marginBottom: '1rem' }}>
-                  ⚠️ Cheating Records ({selectedStudent.cheats.length})
-                </h3>
-                {selectedStudent.cheats.map((cheat, index) => (
-                  <div key={index} className="cheat-item">
-                    <h4>{cheat.project}</h4>
-                    <p><strong>Score:</strong> {cheat.score}</p>
-                    <p><strong>Date:</strong> {new Date(cheat.date).toLocaleDateString()}</p>
-                  </div>
-                ))}
               </div>
             )}
           </div>
         </div>
-      )}
-      </div>
+      </header>
 
-      <footer className="footer">
-        <div className="footer-content">
-          <p>Made with ❤️ by <a href="https://sinek.dev" target="_blank" rel="noopener noreferrer">sinek.dev</a></p>
-          <div className="footer-links">
-            <a href="https://github.com/cilginsinek/42watcherreact" target="_blank" rel="noopener noreferrer" className="github-link">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              Repository
-            </a>
-            <a href="https://github.com/cilginsinek" target="_blank" rel="noopener noreferrer" className="github-link">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              GitHub
-            </a>
+      <main className="mx-auto max-w-7xl px-4 py-8 space-y-8">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="card">
+            <p className="text-(--text-tertiary) text-sm mb-2">Total Students</p>
+            <p className="text-4xl font-bold text-blue-500">{pagination.total}</p>
           </div>
+          <div className="card">
+            <p className="text-(--text-tertiary) text-sm mb-2">Active Users</p>
+            <p className="text-4xl font-bold text-green-500">328</p>
+          </div>
+          <div className="card">
+            <p className="text-(--text-tertiary) text-sm mb-2">Blackholed</p>
+            <p className="text-4xl font-bold text-red-500">45</p>
+          </div>
+        </div>
+
+        {/* Chart Section */}
+        <div className="card">
+          <h2 className="text-xl font-bold mb-6">Weekly Activity</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={stats}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="name" stroke="var(--text-tertiary)" />
+              <YAxis stroke="var(--text-tertiary)" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                labelStyle={{ color: 'var(--text-primary)' }}
+              />
+              <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Search Section */}
+        <div className="card space-y-4">
+          <h2 className="text-xl font-bold">Search Students</h2>
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by login, name, or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input flex-1"
+            />
+            <button type="submit" className="btn btn-primary px-6">
+              Search
+            </button>
+          </form>
+        </div>
+
+        {/* Students Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <div className="inline-block animate-spin mb-4">
+                <div className="h-10 w-10 border-4 border-(--border) border-t-(--primary) rounded-full"></div>
+              </div>
+              <p className="text-(--text-secondary)">Loading students...</p>
+            </div>
+          </div>
+        ) : students.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <div className="mb-3 text-4xl">🔍</div>
+              <h3 className="text-lg font-semibold mb-1">No Results Found</h3>
+              <p className="text-(--text-secondary)">Try adjusting your search criteria.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {students.map((student) => (
+                <div
+                  key={student.id}
+                  onClick={() => handleStudentClick(student)}
+                  className="card-hover group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <img 
+                      src={student.image.versions.medium || "/placeholder.svg"} 
+                      alt={student.login} 
+                      className="h-14 w-14 rounded-lg object-cover border border-(--border)"
+                    />
+                    {student.cheats && student.cheats.length > 0 && (
+                      <span className="inline-block px-2 py-1 bg-red-500/20 text-red-500 text-xs font-bold rounded-full">
+                        🚨 {student.cheats.length}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="font-semibold group-hover:text-(--primary) transition">
+                      {student.displayname || student.login}
+                    </h3>
+                    <p className="text-xs text-(--text-tertiary)">@{student.login}</p>
+                    
+                    <div className="pt-1">
+                      {getStatusBadge(student)}
+                    </div>
+
+                    <div className="pt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div style={{ backgroundColor: 'var(--bg-input)' }} className="rounded px-2 py-1.5">
+                        <p className="text-(--text-tertiary)">Points</p>
+                        <p className="font-semibold text-(--primary)">{student.correction_point}</p>
+                      </div>
+                      <div style={{ backgroundColor: 'var(--bg-input)' }} className="rounded px-2 py-1.5">
+                        <p className="text-(--text-tertiary)">Wallet</p>
+                        <p className="font-semibold text-(--primary)">{student.wallet}₳</p>
+                      </div>
+                    </div>
+
+                    {/* Location Stats */}
+                    {student.location && (
+                      <p className="text-xs text-(--text-secondary) truncate pt-2">📍 {student.location}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 py-6">
+                <button
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={pagination.page === 1}
+                  className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ← Previous
+                </button>
+                <span className="text-(--text-tertiary) text-sm">
+                  Page {pagination.page} of {pagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={pagination.page >= pagination.totalPages}
+                  className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer style={{ borderColor: 'var(--border)' }} className="border-t mt-16">
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <p className="text-center text-sm text-(--text-tertiary)">
+            Made with ❤️ by <a href="https://sinek.dev" target="_blank" rel="noopener noreferrer" className="text-(--primary) hover:opacity-80">sinek.dev</a>
+          </p>
         </div>
       </footer>
     </div>

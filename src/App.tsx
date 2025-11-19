@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import './App.css'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
+import StudentDetail from './pages/StudentDetail'
 import Login from './pages/Login'
 import Callback from './pages/Callback'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -25,6 +25,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Students />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/students/:login"
+        element={
+          <ProtectedRoute>
+            <StudentDetail />
           </ProtectedRoute>
         }
       />

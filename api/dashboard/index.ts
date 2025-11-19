@@ -71,30 +71,35 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Authorization kontrolü
-  const authHeader = req.headers.authorization;
+  // Check if running on localhost (skip auth for local development)
+  const isLocalhost = req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1');
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authorization token required' });
-  }
+  // Authorization kontrolü (skip for localhost)
+  if (!isLocalhost) {
+    const authHeader = req.headers.authorization;
 
-  const token = authHeader.split(' ')[1];
-
-  // Token'ı 42 API ile doğrula
-  try {
-    const verifyResponse = await fetch('https://api.intra.42.fr/v2/me', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!verifyResponse.ok) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization token required' });
     }
-  } catch (error) {
-    console.error('Token verification error:', error);
-    return res.status(401).json({ error: 'Token verification failed' });
+
+    const token = authHeader.split(' ')[1];
+
+    // Token'ı 42 API ile doğrula
+    try {
+      const verifyResponse = await fetch('https://api.intra.42.fr/v2/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!verifyResponse.ok) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return res.status(401).json({ error: 'Token verification failed' });
+    }
   }
 
   try {
@@ -125,7 +130,8 @@ export default async function handler(
       allTimeProjects,
       allTimeWallet,
       allTimePoints,
-      allTimeLevels
+      allTimeLevels,
+      gradeDistribution
     ] = await Promise.all([
       // Bu ay en çok proje teslim edenler
       Project.aggregate([
@@ -296,7 +302,33 @@ export default async function handler(
         .select('login level')
         .sort({ level: -1 })
         .limit(5)
-        .lean()
+        .lean(),
+
+      // Grade distribution
+      Student.aggregate([
+        {
+          $match: {
+            ...campusFilter,
+            grade: { $exists: true, $ne: null, $ne: '' }
+          }
+        },
+        {
+          $group: {
+            _id: '$grade',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { _id: 1 }
+        },
+        {
+          $project: {
+            name: '$_id',
+            value: '$count',
+            _id: 0
+          }
+        }
+      ])
     ]);
 
     // TÜM LOGİNLERİ TOPLA (tekrarsız)
@@ -437,7 +469,8 @@ export default async function handler(
       allTimeProjects: allTimeProjectsWithStudents,
       allTimeWallet: allTimeWalletFormatted,
       allTimePoints: allTimePointsFormatted,
-      allTimeLevels: allTimeLevelsFormatted
+      allTimeLevels: allTimeLevelsFormatted,
+      gradeDistribution
     });
 
   } catch (error) {

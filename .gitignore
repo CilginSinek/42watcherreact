@@ -17,6 +17,10 @@ dist-ssr
 .env.local
 .env.production
 
+# Mock test data
+src/mockData.json
+src/mockData.ts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
