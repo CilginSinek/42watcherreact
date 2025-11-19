@@ -204,12 +204,17 @@ function StudentDetail() {
     return `${Math.round(avg)}h`;
   };
 
-  // Projeleri isme göre grupla
+  // Projeleri isme göre grupla - # varsa sadece # öncesini al
   const groupedProjects = student.projects?.reduce((acc, project) => {
-    if (!acc[project.project]) {
-      acc[project.project] = [];
+    // "Exam Rank 02 #5" -> "Exam Rank 02"
+    const baseProjectName = project.project.includes('#') 
+      ? project.project.split('#')[0].trim() 
+      : project.project;
+    
+    if (!acc[baseProjectName]) {
+      acc[baseProjectName] = [];
     }
-    acc[project.project].push(project);
+    acc[baseProjectName].push(project);
     return acc;
   }, {} as Record<string, Array<{ project: string; score: number; date: string; status: string }>>);
 
