@@ -122,11 +122,10 @@ export default async function handler(
       return res.status(404).json({ error: 'Student not found', login });
     }
 
-    // Student'a ait projeleri getir
+    // Student'a ait projeleri getir - TÜM PROJELERİ
     const projects = await Project.find({ login })
       .select('project score date status')
       .sort({ date: -1 })
-      .limit(20)
       .lean();
 
     // Location stats (kullanılmıyor ama ileride lazım olabilir)
