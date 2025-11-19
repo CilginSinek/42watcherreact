@@ -172,26 +172,49 @@ export default async function handler(
     
     const logTimes: Array<{ date: string; duration: number }> = [];
     
-    if (locationStatsDoc && locationStatsDoc.months) {
-      // Son 2 ayın verilerini al
-      [lastMonthStr, currentMonth].forEach(monthKey => {
-        const monthData = locationStatsDoc.months.get(monthKey);
-        if (monthData && monthData.days) {
-          monthData.days.forEach((duration: string, day: string) => {
-            const date = new Date(day);
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    console.log('LocationStats found:', !!locationStatsDoc);
+    
+    if (locationStatsDoc) {
+      // Mongoose document'ten plain object'e çevir
+      const locationData = locationStatsDoc.toObject();
+      console.log('LocationStats months keys:', locationData.months ? Object.keys(locationData.months) : 'no months');
+      
+      if (locationData.months) {
+        // months bir Map veya object olabilir
+        const monthsData = locationData.months instanceof Map 
+          ? locationData.months 
+          : new Map(Object.entries(locationData.months));
+        
+        // Son 2 ayın verilerini al
+        [lastMonthStr, currentMonth].forEach(monthKey => {
+          const monthData = monthsData.get(monthKey);
+          console.log(`Month ${monthKey} data:`, !!monthData);
+          
+          if (monthData && monthData.days) {
+            const daysData = monthData.days instanceof Map
+              ? monthData.days
+              : new Map(Object.entries(monthData.days));
             
-            if (date >= thirtyDaysAgo) {
-              // Duration HH:MM:SS formatından saniyeye çevir
-              const parts = duration.split(':');
-              const seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-              logTimes.push({ date: day, duration: seconds });
-            }
-          });
-        }
-      });
+            console.log(`Month ${monthKey} days count:`, daysData.size);
+            
+            daysData.forEach((duration: string, day: string) => {
+              const date = new Date(day);
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              
+              if (date >= thirtyDaysAgo) {
+                // Duration HH:MM:SS formatından saniyeye çevir
+                const parts = duration.split(':');
+                const seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+                logTimes.push({ date: day, duration: seconds });
+              }
+            });
+          }
+        });
+      }
     }
+    
+    console.log('Total logTimes entries:', logTimes.length);
     
     // Tarihe göre sırala
     logTimes.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -199,25 +222,37 @@ export default async function handler(
     // Attendance days (haftalık ortalama) - tüm months verisinden hesapla
     const dayStats: { [key: number]: { totalSeconds: number; count: number } } = {};
     
-    if (locationStatsDoc && locationStatsDoc.months) {
-      locationStatsDoc.months.forEach((monthData: { days?: Map<string, string>; totalDuration?: string }) => {
-        if (monthData.days) {
-          monthData.days.forEach((duration: string, day: string) => {
-            const date = new Date(day);
-            const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    if (locationStatsDoc) {
+      const locationData = locationStatsDoc.toObject();
+      
+      if (locationData.months) {
+        const monthsData = locationData.months instanceof Map 
+          ? locationData.months 
+          : new Map(Object.entries(locationData.months));
+        
+        monthsData.forEach((monthData: { days?: Map<string, string> | Record<string, string>; totalDuration?: string }) => {
+          if (monthData.days) {
+            const daysData = monthData.days instanceof Map
+              ? monthData.days
+              : new Map(Object.entries(monthData.days));
             
-            // Duration HH:MM:SS formatından saniyeye çevir
-            const parts = duration.split(':');
-            const seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+            daysData.forEach((duration: string, day: string) => {
+              const date = new Date(day);
+              const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
             
-            if (!dayStats[dayOfWeek]) {
-              dayStats[dayOfWeek] = { totalSeconds: 0, count: 0 };
-            }
-            dayStats[dayOfWeek].totalSeconds += seconds;
-            dayStats[dayOfWeek].count += 1;
-          });
-        }
-      });
+              // Duration HH:MM:SS formatından saniyeye çevir
+              const parts = duration.split(':');
+              const seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+              
+              if (!dayStats[dayOfWeek]) {
+                dayStats[dayOfWeek] = { totalSeconds: 0, count: 0 };
+              }
+              dayStats[dayOfWeek].totalSeconds += seconds;
+              dayStats[dayOfWeek].count += 1;
+            });
+          }
+        });
+      }
     }
     
     // Ortalamayı hesapla ve formatla

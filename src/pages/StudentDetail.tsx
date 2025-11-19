@@ -61,6 +61,7 @@ function StudentDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly' | 'quarterly'>('weekly');
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -196,6 +197,27 @@ function StudentDetail() {
     if (!logTimesData.length) return '0h';
     const avg = logTimesData.reduce((sum, item) => sum + item.duration, 0) / 3600 / logTimesData.length;
     return `${Math.round(avg)}h`;
+  };
+
+  // Projeleri isme göre grupla
+  const groupedProjects = student.projects?.reduce((acc, project) => {
+    if (!acc[project.project]) {
+      acc[project.project] = [];
+    }
+    acc[project.project].push(project);
+    return acc;
+  }, {} as Record<string, Array<{ project: string; score: number; date: string; status: string }>>);
+
+  const toggleProjectExpansion = (projectName: string) => {
+    setExpandedProjects(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectName)) {
+        newSet.delete(projectName);
+      } else {
+        newSet.add(projectName);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -405,29 +427,82 @@ function StudentDetail() {
             <div className="card">
               <h3 className="text-lg font-bold text-(--text-primary) mb-4">📋 Projects</h3>
               <div className="space-y-3">
-                {student.projects && student.projects.length > 0 ? (
-                  student.projects.map((project, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4 p-3 md:p-4 rounded-lg"
-                      style={{ backgroundColor: 'var(--bg-input)' }}
-                    >
-                      <div className="flex-1 w-full">
-                        <p className="font-semibold text-(--text-primary) text-sm md:text-base">{project.project}</p>
-                        <p className="text-xs md:text-sm text-(--text-secondary)">{formatDate(project.date)}</p>
+                {groupedProjects && Object.keys(groupedProjects).length > 0 ? (
+                  Object.entries(groupedProjects).map(([projectName, projectList]) => {
+                    const isExpanded = expandedProjects.has(projectName);
+                    const hasMultiple = projectList.length > 1;
+                    const latestProject = projectList[projectList.length - 1];
+                    
+                    return (
+                      <div key={projectName} className="rounded-lg" style={{ backgroundColor: 'var(--bg-input)' }}>
+                        {/* Header - Her zaman görünür */}
+                        <div
+                          className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4 p-3 md:p-4 ${
+                            hasMultiple ? 'cursor-pointer hover:opacity-80' : ''
+                          }`}
+                          onClick={() => hasMultiple && toggleProjectExpansion(projectName)}
+                        >
+                          <div className="flex-1 w-full">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-(--text-primary) text-sm md:text-base">{projectName}</p>
+                              {hasMultiple && (
+                                <span className="text-xs bg-(--primary) text-white px-2 py-0.5 rounded-full">
+                                  {projectList.length}x
+                                </span>
+                              )}
+                              {hasMultiple && (
+                                <svg
+                                  className={`w-4 h-4 text-(--text-tertiary) transition-transform ${
+                                    isExpanded ? 'rotate-180' : ''
+                                  }`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              )}
+                            </div>
+                            <p className="text-xs md:text-sm text-(--text-secondary)">{formatDate(latestProject.date)}</p>
+                          </div>
+                          <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
+                            <span className={`px-3 py-1 rounded-full text-xs md:text-sm font-medium whitespace-nowrap ${
+                              latestProject.status === 'success' ? 'bg-green-100 text-green-700' :
+                              latestProject.status === 'fail' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {latestProject.status.replace('_', ' ')}
+                            </span>
+                            <span className="text-lg md:text-2xl font-bold text-(--primary) whitespace-nowrap">{latestProject.score}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Expanded - Diğer denemeler */}
+                        {hasMultiple && isExpanded && (
+                          <div className="border-t border-(--border) px-3 md:px-4 pb-3 pt-2">
+                            <p className="text-xs text-(--text-tertiary) mb-2 font-medium">Previous Attempts:</p>
+                            <div className="space-y-2">
+                              {projectList.slice(0, -1).reverse().map((project, idx) => (
+                                <div key={idx} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 p-2 rounded bg-(--bg-primary) bg-opacity-50">
+                                  <p className="text-xs md:text-sm text-(--text-secondary)">{formatDate(project.date)}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      project.status === 'success' ? 'bg-green-100 text-green-700' :
+                                      project.status === 'fail' ? 'bg-red-100 text-red-700' :
+                                      'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                      {project.status.replace('_', ' ')}
+                                    </span>
+                                    <span className="text-sm md:text-lg font-bold text-(--primary)">{project.score}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
-                        <span className={`px-3 py-1 rounded-full text-xs md:text-sm font-medium whitespace-nowrap ${
-                          project.status === 'success' ? 'bg-green-100 text-green-700' :
-                          project.status === 'fail' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {project.status.replace('_', ' ')}
-                        </span>
-                        <span className="text-lg md:text-2xl font-bold text-(--primary) whitespace-nowrap">{project.score}</span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-(--text-secondary)">No projects yet</p>
                 )}
