@@ -32,7 +32,8 @@ function getSafeImageLink(link: string | undefined): string {
   if (
     trimmed.startsWith("//") ||
     trimmed.toLowerCase().startsWith("data:") ||
-    trimmed.toLowerCase().startsWith("javascript:")
+    trimmed.toLowerCase().startsWith("javascript:") ||
+    trimmed.toLowerCase().startsWith("vbscript:")
   ) {
     return "/placeholder.svg";
   }
