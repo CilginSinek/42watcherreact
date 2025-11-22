@@ -18,9 +18,41 @@ interface StudentModalProps {
 
 // Helper function to validate and sanitize login username
 const isValidLogin = (login: string): boolean => {
-  // Login should only contain alphanumeric characters, underscores, dashes, or dots
   const validLoginPattern = /^[a-zA-Z0-9_.-]+$/;
   return validLoginPattern.test(login) && login.length > 0 && login.length <= 50;
+};
+
+// Helper function to validate and sanitize image URLs
+const getSafeImageUrl = (url: string): string => {
+  if (!url || typeof url !== 'string') return '/placeholder.svg';
+  
+  const trimmedUrl = url.trim();
+  
+  // Allow local paths starting with /
+  if (trimmedUrl.startsWith('/')) {
+    // Prevent path traversal
+    if (trimmedUrl.includes('..')) return '/placeholder.svg';
+    return trimmedUrl;
+  }
+  
+  // Only allow HTTPS URLs from trusted 42 domains
+  try {
+    const parsedUrl = new URL(trimmedUrl);
+    
+    // Block dangerous protocols
+    if (parsedUrl.protocol !== 'https:') return '/placeholder.svg';
+    
+    // Whitelist trusted domains
+    const trustedDomains = ['profile.intra.42.fr', 'cdn.intra.42.fr'];
+    const hostname = parsedUrl.hostname.toLowerCase();
+    
+    if (!trustedDomains.includes(hostname)) return '/placeholder.svg';
+    
+    return trimmedUrl;
+  } catch {
+    // Invalid URL
+    return '/placeholder.svg';
+  }
 };
 
 export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
@@ -33,8 +65,8 @@ export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
     onClose();
   };
 
-  // Validate login for safe URL usage
   const safeLogin = isValidLogin(student.login) ? student.login : null;
+  const safeImageUrl = getSafeImageUrl(student.image.link);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -55,7 +87,7 @@ export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
         {/* Student Info */}
         <div className="flex gap-4 mb-6 flex-col sm:flex-row">
           <img
-            src={student.image.link || "/placeholder.svg"}
+            src={safeImageUrl}
             alt={student.login}
             className="w-16 h-16 rounded-lg object-cover shrink-0"
           />
