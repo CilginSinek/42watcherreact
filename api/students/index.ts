@@ -222,7 +222,10 @@ export default async function handler(
       'log_time': 'logTime',
       'evo_performance': 'evoPerformance',
       'feedback_count': 'feedbackCount',
-      'avg_rating': 'avgRating'
+      'avg_rating': 'avgRating',
+      'wallet': 'wallet',
+      'correction_point': 'correction_point',
+      'login': 'login'
     };
 
   // Only allow known sort fields; fallback to 'login' for safety

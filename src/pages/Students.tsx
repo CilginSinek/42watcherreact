@@ -176,6 +176,13 @@ function Students() {
                 <option value="correction_point">Correction Points</option>
                 <option value="wallet">Wallet</option>
                 <option value="project_count">Project Count</option>
+                <option value="cheat_count">Cheat Count</option>
+                <option value="godfather_count">Godfather Count</option>
+                <option value="children_count">Children Count</option>
+                <option value="log_time">Log Time</option>
+                <option value="evo_performance">Evo Performance</option>
+                <option value="feedback_count">Feedback Count</option>
+                <option value="avg_rating">Average Rating</option>
               </select>
 
               <button
