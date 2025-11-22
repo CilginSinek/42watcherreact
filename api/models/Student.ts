@@ -26,6 +26,7 @@ const studentSchema = new mongoose.Schema({
   correction_point: Number,
   pool_month: String,
   pool_year: String,
+  level: Number,
   wallet: Number,
   anonymize_date: String,
   data_erasure_date: String,

@@ -232,10 +232,9 @@ function Students() {
                 className="input py-2 text-sm"
               >
                 <option value="login">Sort by Login</option>
+                <option value="level">Level</option>
                 <option value="correction_point">Correction Points</option>
                 <option value="wallet">Wallet</option>
-                <option value="pool_year">Pool Year</option>
-                <option value="pool_month">Pool Month</option>
                 <option value="project_count">Project Count</option>
                 <option value="cheat_count">Cheat Count</option>
                 <option value="godfather_count">Godfather Count</option>

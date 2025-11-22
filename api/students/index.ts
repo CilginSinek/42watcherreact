@@ -59,6 +59,7 @@ async function connectDB() {
  *   db.students.createIndex({ login: 1, campusId: 1 })
  *   db.students.createIndex({ correction_point: -1 })
  *   db.students.createIndex({ wallet: -1 })
+ *   db.students.createIndex({ level: -1 })
  *   db.students.createIndex({ created_at: -1 })
  * 
  * Projects collection:
@@ -237,8 +238,7 @@ export default async function handler(
       'avg_rating': 'avgRating',
       'wallet': 'wallet',
       'correction_point': 'correction_point',
-      'pool_month': 'pool_month',
-      'pool_year': 'pool_year',
+      'level': 'level',
       'login': 'login'
     };
 
