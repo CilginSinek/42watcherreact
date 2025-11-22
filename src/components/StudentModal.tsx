@@ -25,33 +25,52 @@ const isValidLogin = (login: string): boolean => {
 
 // Helper function to validate image URL
 function getSafeImageLink(link: string | undefined): string {
-  // Accept only links via https/http URLs or starting with '/' AND ending with a safe image extension
+  // Accept only absolute URLs from trusted domains or local paths starting with '/' that end with a safe image extension.
   if (!link || typeof link !== "string") return "/placeholder.svg";
-  const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
   const trimmed = link.trim();
-
-  // Helper to check for allowed image extensions (case insensitive)
+  // No protocol-relative, data, or javascript URLs
+  if (
+    trimmed.startsWith("//") ||
+    trimmed.toLowerCase().startsWith("data:") ||
+    trimmed.toLowerCase().startsWith("javascript:")
+  ) {
+    return "/placeholder.svg";
+  }
+  // Only allow image-like file extensions (case insensitive, before query/hash)
+  const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
   function hasAllowedExtension(url: string): boolean {
-    return allowedExtensions.some(ext => url.toLowerCase().endsWith(ext));
-  }
-
-  // Only allow absolute paths starting with '/' and ending with allowed extension
-  if (trimmed.startsWith("/") && hasAllowedExtension(trimmed)) {
-    return trimmed;
-  }
-
-  // Only allow URLs starting with "https://" or "http://" and ending with allowed extension
-  if ((trimmed.startsWith("https://") || trimmed.startsWith("http://")) && hasAllowedExtension(trimmed)) {
     try {
-      const url = new URL(trimmed);
-      // Only allow http(s) protocols and correct extension
-      if ((url.protocol === "https:" || url.protocol === "http:") && hasAllowedExtension(url.pathname)) return url.href;
+      // Remove query/hash
+      const clean = url.split(/[?#]/)[0].toLowerCase();
+      return allowedExtensions.some(ext => clean.endsWith(ext));
     } catch {
-      // fall-through to placeholder
+      return false;
     }
   }
-
-  // Block anything else (including data:, javascript:, protocol-relative, etc.)
+  // Only allow absolute paths starting with '/' (not '//'!) and ending with allowed extension
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//") && hasAllowedExtension(trimmed)) {
+    return trimmed;
+  }
+  // Only allow HTTPS URLs from specific trusted domains and ending with allowed extension
+  try {
+    const url = new URL(trimmed);
+    const allowedProtocols = ["https:", "http:"];
+    const allowedHosts = [
+      "cdn.intra.42.fr",
+      "profile.intra.42.fr",
+      "static.sinek.dev"
+    ];
+    if (
+      allowedProtocols.includes(url.protocol) &&
+      allowedHosts.includes(url.hostname) &&
+      hasAllowedExtension(url.pathname)
+    ) {
+      return url.href;
+    }
+  } catch {
+    // Invalid URL falls through to placeholder
+  }
+  // Block anything else (including protocol-relative, data:, javascript:, suspicious hosts, etc.)
   return "/placeholder.svg";
 }
 
