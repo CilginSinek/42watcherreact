@@ -342,7 +342,7 @@ function Students() {
                       </div>
 
                       {/* Project Count - sadece 0'dan büyükse göster */}
-                      {student.project_count && student.project_count > 0 && (
+                      {student.project_count !== undefined && student.project_count > 0 && (
                         <p className="text-(--text-tertiary) text-xs mt-2">📦 {student.project_count} project{student.project_count > 1 ? 's' : ''}</p>
                       )}
 
