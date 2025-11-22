@@ -22,6 +22,7 @@ const isValidLogin = (login: string): boolean => {
   return validLoginPattern.test(login) && login.length > 0 && login.length <= 50;
 };
 
+<<<<<<< HEAD
 // Helper function to validate and sanitize image URLs
 const getSafeImageUrl = (url: string): string => {
   if (!url || typeof url !== 'string') return '/placeholder.svg';
@@ -54,6 +55,39 @@ const getSafeImageUrl = (url: string): string => {
     return '/placeholder.svg';
   }
 };
+=======
+// Helper function to validate image URL
+function getSafeImageLink(link: string | undefined): string {
+  // Accept only links via https/http URLs or starting with '/' AND ending with a safe image extension
+  if (!link || typeof link !== "string") return "/placeholder.svg";
+  const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
+  const trimmed = link.trim();
+
+  // Helper to check for allowed image extensions (case insensitive)
+  function hasAllowedExtension(url: string): boolean {
+    return allowedExtensions.some(ext => url.toLowerCase().endsWith(ext));
+  }
+
+  // Only allow absolute paths starting with '/' and ending with allowed extension
+  if (trimmed.startsWith("/") && hasAllowedExtension(trimmed)) {
+    return trimmed;
+  }
+
+  // Only allow URLs starting with "https://" or "http://" and ending with allowed extension
+  if ((trimmed.startsWith("https://") || trimmed.startsWith("http://")) && hasAllowedExtension(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      // Only allow http(s) protocols and correct extension
+      if ((url.protocol === "https:" || url.protocol === "http:") && hasAllowedExtension(url.pathname)) return url.href;
+    } catch {
+      // fall-through to placeholder
+    }
+  }
+
+  // Block anything else (including data:, javascript:, protocol-relative, etc.)
+  return "/placeholder.svg";
+}
+>>>>>>> e2625d30e655f8d4e2fe78e601d04a04d5f115ad
 
 export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
   const navigate = useNavigate();
@@ -67,6 +101,9 @@ export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
 
   const safeLogin = isValidLogin(student.login) ? student.login : null;
   const safeImageUrl = getSafeImageUrl(student.image.link);
+
+  // Validate image link before using in src
+  const safeImageLink = getSafeImageLink(student.image?.link);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -87,7 +124,11 @@ export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
         {/* Student Info */}
         <div className="flex gap-4 mb-6 flex-col sm:flex-row">
           <img
+<<<<<<< HEAD
             src={safeImageUrl}
+=======
+            src={safeImageLink}
+>>>>>>> e2625d30e655f8d4e2fe78e601d04a04d5f115ad
             alt={student.login}
             className="w-16 h-16 rounded-lg object-cover shrink-0"
           />
