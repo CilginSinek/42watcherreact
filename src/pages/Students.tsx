@@ -57,6 +57,7 @@ function Students() {
   const [loading, setLoading] = useState(!studentsData);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [campusId, setCampusId] = useState('all');
   const [poolMonth, setPoolMonth] = useState('');
   const [poolYear, setPoolYear] = useState('');
   const [pools, setPools] = useState<Pool[]>([]);
@@ -89,6 +90,7 @@ function Students() {
         order,
         ...(search && { search }),
         ...(status !== 'all' && { status }),
+        ...(campusId !== 'all' && { campusId }),
         ...(poolMonth && { poolMonth }),
         ...(poolYear && { poolYear })
       });
@@ -116,7 +118,7 @@ function Students() {
     if (!token) return;
     fetchStudents();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, sortBy, order, status, poolMonth, poolYear, token]);
+  }, [pagination.page, sortBy, order, status, campusId, poolMonth, poolYear, token]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,7 +201,7 @@ function Students() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               <select
                 value={status}
                 onChange={(e) => {
@@ -211,6 +213,19 @@ function Students() {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="alumni">Alumni</option>
+              </select>
+
+              <select
+                value={campusId}
+                onChange={(e) => {
+                  setCampusId(e.target.value);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="input py-2 text-sm"
+              >
+                <option value="all">All Campuses</option>
+                <option value="50">Kocaeli</option>
+                <option value="49">Istanbul</option>
               </select>
 
               <select
@@ -314,9 +329,9 @@ function Students() {
                         </div>
                       </div>
 
-                      {/* Monthly Location Stats */}
+                      {/* Project Count - sadece 0'dan büyükse göster */}
                       {student.project_count && student.project_count > 0 && (
-                        <p className="text-(--text-tertiary) text-xs mt-2">📦 {student.project_count} projects</p>
+                        <p className="text-(--text-tertiary) text-xs mt-2">📦 {student.project_count} project{student.project_count > 1 ? 's' : ''}</p>
                       )}
 
                       {student.location && (
