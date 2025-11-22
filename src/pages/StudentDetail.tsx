@@ -594,7 +594,7 @@ function StudentDetail() {
 
           <div className="space-y-6 md:space-y-8">
             {/* Feedback */}
-            {student.feedbackCount && student.feedbackCount > 0 && (
+            {student.feedbackCount && student.feedbackCount > 0 && student.avgRating && (
               <div className="card">
                 <h3 className="text-lg font-bold text-(--text-primary) mb-4">Evaluation</h3>
                 <div className="space-y-3">
@@ -604,7 +604,7 @@ function StudentDetail() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-(--text-secondary)">Average Rating</span>
-                    <span className="font-bold text-(--primary)">{(student.avgRating ?? 0).toFixed(2)}/5</span>
+                    <span className="font-bold text-(--primary)">{student.avgRating.toFixed(2)}/5</span>
                   </div>
                 </div>
               </div>
