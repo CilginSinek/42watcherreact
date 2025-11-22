@@ -25,22 +25,33 @@ const isValidLogin = (login: string): boolean => {
 
 // Helper function to validate image URL
 function getSafeImageLink(link: string | undefined): string {
-  // Only allow links via https/http URLs or starting with '/'
+  // Accept only links via https/http URLs or starting with '/' AND ending with a safe image extension
   if (!link || typeof link !== "string") return "/placeholder.svg";
-  // Block data: and javascript: URLs outright
+  const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
   const trimmed = link.trim();
-  if (trimmed.startsWith("/")) return trimmed;
-  // Only allow URLs starting with "https://" or "http://"
-  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+
+  // Helper to check for allowed image extensions (case insensitive)
+  function hasAllowedExtension(url: string): boolean {
+    return allowedExtensions.some(ext => url.toLowerCase().endsWith(ext));
+  }
+
+  // Only allow absolute paths starting with '/' and ending with allowed extension
+  if (trimmed.startsWith("/") && hasAllowedExtension(trimmed)) {
+    return trimmed;
+  }
+
+  // Only allow URLs starting with "https://" or "http://" and ending with allowed extension
+  if ((trimmed.startsWith("https://") || trimmed.startsWith("http://")) && hasAllowedExtension(trimmed)) {
     try {
       const url = new URL(trimmed);
-      // Only images (optionally add img extension check if needed)
-      if (url.protocol === "https:" || url.protocol === "http:") return url.href;
+      // Only allow http(s) protocols and correct extension
+      if ((url.protocol === "https:" || url.protocol === "http:") && hasAllowedExtension(url.pathname)) return url.href;
     } catch {
       // fall-through to placeholder
     }
   }
-  // Block anything else (including data:, javascript:, etc.)
+
+  // Block anything else (including data:, javascript:, protocol-relative, etc.)
   return "/placeholder.svg";
 }
 
