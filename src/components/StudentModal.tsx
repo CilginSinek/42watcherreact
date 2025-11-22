@@ -25,18 +25,23 @@ const isValidLogin = (login: string): boolean => {
 
 // Helper function to validate image URL
 function getSafeImageLink(link: string | undefined): string {
-  // Only allow links via https/http or starting with '/'
-  if (!link) return "/placeholder.svg";
-  try {
-    // Allow relative paths only (start with /), or web URLs only
-    if (link.startsWith("/")) return link;
-    const url = new URL(link, window.location.origin); // Try to parse as absolute or relative
-    if (url.protocol === "https:" || url.protocol === "http:") return url.href;
-    // Otherwise block (including javascript:, data:, etc.)
-    return "/placeholder.svg";
-  } catch {
-    return "/placeholder.svg";
+  // Only allow links via https/http URLs or starting with '/'
+  if (!link || typeof link !== "string") return "/placeholder.svg";
+  // Block data: and javascript: URLs outright
+  const trimmed = link.trim();
+  if (trimmed.startsWith("/")) return trimmed;
+  // Only allow URLs starting with "https://" or "http://"
+  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+    try {
+      const url = new URL(trimmed);
+      // Only images (optionally add img extension check if needed)
+      if (url.protocol === "https:" || url.protocol === "http:") return url.href;
+    } catch {
+      // fall-through to placeholder
+    }
   }
+  // Block anything else (including data:, javascript:, etc.)
+  return "/placeholder.svg";
 }
 
 export function StudentModal({ isOpen, student, onClose }: StudentModalProps) {
