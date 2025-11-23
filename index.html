@@ -51,5 +51,11 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if(localStorage.getItem('isWarned') !== 'true') {
+        alert('Ücretsiz veritabanı bulamadığımdan dolayı uygulama düzgün ve güncel verilerle çalışmayabilir. Lütfen bu durumu göz önünde bulundurun. Önerilerinizi slackden iletebilirsiniz: https://42-stanbul-workspace.slack.com/archives/C02SEUSVBDZ/p1763913408651609');
+        localStorage.setItem('isWarned', 'true');
+      }
+    </script>
   </body>
 </html>
