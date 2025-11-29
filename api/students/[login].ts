@@ -242,7 +242,9 @@ export default async function handler(
 
     // Student objesini düzgün serialize et
     const studentData = {
-      ...student,
+    ...(student.students !== undefined 
+      ? student.students 
+      : student),
       projects,
       project_count,
       feedbackCount,
