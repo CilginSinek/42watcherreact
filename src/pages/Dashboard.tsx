@@ -41,6 +41,7 @@ interface DashboardData {
   gradeDistribution: { name: string; value: number }[];
   hourlyOccupancy: { hour: string; occupancy: number }[];
   weeklyOccupancy: { day: string; occupancy: number }[];
+  performanceTrend: { name: string; value: number }[];
 }
 
 function Dashboard() {
@@ -205,12 +206,7 @@ function Dashboard() {
               <div className="card">
                 <h3 className="text-lg font-bold mb-6">Performance Trend</h3>
                 <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={[
-                    { name: 'Week 1', value: 400 },
-                    { name: 'Week 2', value: 450 },
-                    { name: 'Week 3', value: 380 },
-                    { name: 'Week 4', value: 520 }
-                  ]}>
+                  <LineChart data={data.performanceTrend || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="name" stroke="var(--text-tertiary)" />
                     <YAxis stroke="var(--text-tertiary)" />

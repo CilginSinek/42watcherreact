@@ -510,28 +510,26 @@ export default async function handler(
       student: getStudentWithProjects(student.login as string)
     }));
 
-    // Hourly and Weekly occupancy - database'den günlük verilerden hesaplanıyor
-    // OPTIMIZED: Tek sorgu ile hem hourly hem weekly veriyi hesapla
-    const occupancyQuery = `
+    // Hourly occupancy - 24 saatlik veri (database'den - eski hali geri getirildi)
+    const hourlyOccupancyQuery = `
       SELECT months
       FROM ${locationStatsKeyspace}
       ${campusId ? 'WHERE campusId = $campusId' : ''}
     `;
-    const occupancyParams: any = {};
+    const hourlyParams: any = {};
     if (campusId) {
-      occupancyParams.campusId = campusId;
+      hourlyParams.campusId = campusId;
     }
-    const occupancyResult = await executeQuery(occupancyQuery, {
-      parameters: occupancyParams
+    const hourlyResult = await executeQuery(hourlyOccupancyQuery, {
+      parameters: hourlyParams
     });
 
-    // Son 30 günün verilerini kullan (hourly için)
+    // Son 30 günün verilerini kullan
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const hourlyCounts: { [key: number]: number } = {};
-    const dayOfWeekCounts: { [key: number]: number } = {};
     
-    for (const row of occupancyResult.rows as any[]) {
+    for (const row of hourlyResult.rows as any[]) {
       if (!row.months) continue;
       
       for (const monthKey of Object.keys(row.months)) {
@@ -541,20 +539,16 @@ export default async function handler(
         for (const day of Object.keys(monthData.days)) {
           const fullDate = `${monthKey}-${String(day).padStart(2, '0')}`;
           const date = new Date(fullDate);
-          const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-          const duration = monthData.days[day];
           
-          // Duration'dan saniye hesapla
-          const parts = duration.split(':');
-          const totalSeconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-          
-          // Weekly occupancy için (son 3 ay)
-          if (monthKey >= threeMonthsAgoStr) {
-            dayOfWeekCounts[dayOfWeek] = (dayOfWeekCounts[dayOfWeek] || 0) + 1;
-          }
-          
-          // Hourly occupancy için (son 30 gün)
+          // Son 30 gün içindeyse
           if (date >= thirtyDaysAgo) {
+            const dayOfWeek = date.getDay();
+            const duration = monthData.days[day];
+            
+            // Duration'dan saniye hesapla
+            const parts = duration.split(':');
+            const totalSeconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+            
             // Günlük ortalama süreyi saatlere dağıt (basit bir model)
             // Hafta içi: 8-18 arası yoğun, hafta sonu: 10-16 arası yoğun
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -573,7 +567,7 @@ export default async function handler(
       }
     }
 
-    // Hourly occupancy normalize et ve formatla
+    // Normalize et ve formatla
     const maxHourlyCount = Math.max(...Object.values(hourlyCounts), 1);
     const hourlyOccupancy = Array.from({ length: 24 }, (_, i) => {
       const hour = i.toString().padStart(2, '0');
@@ -583,14 +577,93 @@ export default async function handler(
       return { hour: `${hour}:00`, occupancy };
     });
 
-    // Weekly occupancy formatla
+    // Weekly occupancy - haftanın günlerine göre
+    const weeklyOccupancyQuery = `
+      SELECT months
+      FROM ${locationStatsKeyspace}
+      ${campusId ? 'WHERE campusId = $campusId' : ''}
+    `;
+    const weeklyParams: any = {};
+    if (campusId) {
+      weeklyParams.campusId = campusId;
+    }
+    const weeklyResult = await executeQuery(weeklyOccupancyQuery, {
+      parameters: weeklyParams
+    });
+    
+    const dayOfWeekCounts: { [key: number]: number } = {};
+    
+    for (const row of weeklyResult.rows as any[]) {
+      if (!row.months) continue;
+      
+      for (const monthKey of Object.keys(row.months)) {
+        if (monthKey < threeMonthsAgoStr) continue;
+        
+        const monthData = row.months[monthKey];
+        if (!monthData || !monthData.days) continue;
+        
+        for (const day of Object.keys(monthData.days)) {
+          const fullDate = `${monthKey}-${String(day).padStart(2, '0')}`;
+          const date = new Date(fullDate);
+          const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+          
+          dayOfWeekCounts[dayOfWeek] = (dayOfWeekCounts[dayOfWeek] || 0) + 1;
+        }
+      }
+    }
+    
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const maxWeeklyCount = Math.max(...Object.values(dayOfWeekCounts), 1);
     const weeklyOccupancy = dayNames.map((day, index) => {
       const count = dayOfWeekCounts[index] || 0;
-      const occupancy = Math.round((count / maxWeeklyCount) * 100);
+      const occupancy = count ? Math.round((count / maxWeeklyCount) * 100) : 0;
       return { day, occupancy };
     });
+
+    // Performance Trend - Son 4 haftanın proje teslim sayıları
+    // Son 28 günün projelerini çek ve JavaScript'te haftalara böl
+    const twentyEightDaysAgo = new Date();
+    twentyEightDaysAgo.setDate(twentyEightDaysAgo.getDate() - 28);
+    const performanceTrendQuery = `
+      SELECT date
+      FROM ${projectsKeyspace}
+      WHERE date >= $dateStart
+        AND score > 0
+        ${campusId ? 'AND campusId = $campusId' : ''}
+    `;
+    const performanceParams: any = {
+      dateStart: twentyEightDaysAgo.toISOString().split('T')[0]
+    };
+    if (campusId) {
+      performanceParams.campusId = campusId;
+    }
+    const performanceResult = await executeQuery(performanceTrendQuery, {
+      parameters: performanceParams
+    });
+    
+    // Son 4 haftayı oluştur
+    const weeklyCounts: { [key: number]: number } = {};
+    const now = new Date();
+    
+    // Her projeyi haftasına göre say
+    for (const row of performanceResult.rows as any[]) {
+      const projectDate = new Date(row.date);
+      const daysDiff = Math.floor((now.getTime() - projectDate.getTime()) / (1000 * 60 * 60 * 24));
+      const weekNumber = Math.floor(daysDiff / 7);
+      
+      // Son 4 hafta (0-3)
+      if (weekNumber >= 0 && weekNumber < 4) {
+        weeklyCounts[weekNumber] = (weeklyCounts[weekNumber] || 0) + 1;
+      }
+    }
+    
+    const performanceTrend = [];
+    for (let i = 3; i >= 0; i--) {
+      performanceTrend.push({
+        name: `Week ${4 - i}`,
+        value: weeklyCounts[i] || 0
+      });
+    }
 
     // weeklyOccupancy artık yukarıda hesaplandı, weeklyOccupancyData kullanılmıyor
 
@@ -604,7 +677,8 @@ export default async function handler(
       allTimeLevels: allTimeLevelsFormatted,
       gradeDistribution,
       hourlyOccupancy,
-      weeklyOccupancy
+      weeklyOccupancy,
+      performanceTrend
     });
 
   } catch (error) {
