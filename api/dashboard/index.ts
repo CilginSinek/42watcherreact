@@ -1,53 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import mongoose from 'mongoose';
-import { Student, Project, LocationStats, Patronage, Feedback } from '../models/Student.js';
-
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define MONGODB_URI environment variable');
-}
-
-interface CachedConnection {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-}
-
-declare global {
-  var mongoose: CachedConnection | undefined;
-}
-
-const cached: CachedConnection = global.mongoose || { conn: null, promise: null };
-
-if (!global.mongoose) {
-  global.mongoose = cached;
-}
-
-async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
-    });
-  }
-
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
-
-  return cached.conn;
-}
+import { executeQuery, getKeyspace } from '../../utils/couchbase.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -103,15 +55,13 @@ export default async function handler(
   }
 
   try {
-    await connectDB();
-
     // Query parametrelerini al
     const campusIdParam = req.query.campusId as string | undefined;
     
     // Campus filter oluştur
-    const campusFilter = campusIdParam && campusIdParam !== 'all' 
-      ? { campusId: parseInt(campusIdParam) } 
-      : {};
+    const campusId = campusIdParam && campusIdParam !== 'all' 
+      ? parseInt(campusIdParam) 
+      : null;
 
     // Tarih hesaplamaları
     const now = new Date();
@@ -122,6 +72,12 @@ export default async function handler(
     // Son 3 ay için tarih aralığı
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
     const threeMonthsAgoStr = `${threeMonthsAgo.getFullYear()}-${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}`;
+
+    const studentsKeyspace = getKeyspace('students');
+    const projectsKeyspace = getKeyspace('projects');
+    const locationStatsKeyspace = getKeyspace('locationstats');
+    const patronagesKeyspace = getKeyspace('patronages');
+    const feedbacksKeyspace = getKeyspace('feedbacks');
 
     // TÜM AGGREGATİONLARI PARALEL ÇALIŞTIR
     const [
@@ -135,319 +91,360 @@ export default async function handler(
       weeklyOccupancyData
     ] = await Promise.all([
       // Bu ay en çok proje teslim edenler
-      Project.aggregate([
-        {
-          $match: {
-            ...campusFilter,
-            date: {
-              $gte: monthStart.toISOString().split('T')[0],
-              $lte: monthEnd.toISOString().split('T')[0]
-            },
-            score: { $gt: 0 }
-          }
-        },
-        {
-          $group: {
-            _id: '$login',
-            projectCount: { $sum: 1 },
-            totalScore: { $sum: '$score' },
-            projects: {
-              $push: {
-                project: '$project',
-                score: '$score',
-                date: '$date'
-              }
-            }
-          }
-        },
-        {
-          $sort: { projectCount: -1, totalScore: -1 }
-        },
-        {
-          $limit: 5
+      (async () => {
+        const campusFilter = campusId ? 'AND campusId = $campusId' : '';
+        const queryParams: any = {
+          monthStart: monthStart.toISOString().split('T')[0],
+          monthEnd: monthEnd.toISOString().split('T')[0]
+        };
+        if (campusId) {
+          queryParams.campusId = campusId;
         }
-      ]),
+        const query = `
+          SELECT 
+            login AS _id,
+            COUNT(*) AS projectCount,
+            SUM(score) AS totalScore,
+            ARRAY_AGG({
+              "project": project,
+              "score": score,
+              "date": date
+            }) AS projects
+          FROM ${projectsKeyspace}
+          WHERE date >= $monthStart 
+            AND date <= $monthEnd
+            AND score > 0
+            ${campusFilter}
+          GROUP BY login
+          ORDER BY projectCount DESC, totalScore DESC
+          LIMIT 5
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        return result.rows;
+      })(),
       
       // Son 3 ay en çok kampüste kalanlar
-      LocationStats.aggregate([
-      {
-        $match: campusFilter
-      },
-      {
-        $project: {
-          login: 1,
-          campusId: 1,
-          monthsArray: { $objectToArray: '$months' }
+      (async () => {
+        // N1QL'de object'leri iterate etmek için JavaScript'te yapılacak
+        // Önce tüm locationStats'ı çek
+        const campusFilter = campusId ? 'WHERE campusId = $campusId' : '';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
         }
-      },
-      {
-        $unwind: '$monthsArray'
-      },
-      {
-        $match: {
-          'monthsArray.k': { $gte: threeMonthsAgoStr }
-        }
-      },
-      {
-        $addFields: {
-          // totalDuration'ı string'den saniyeye çevir (HH:MM:SS formatı)
-          durationParts: { $split: ['$monthsArray.v.totalDuration', ':'] },
-        }
-      },
-      {
-        $addFields: {
-          durationSeconds: {
-            $add: [
-              { $multiply: [{ $toInt: { $arrayElemAt: ['$durationParts', 0] } }, 3600] }, // hours
-              { $multiply: [{ $toInt: { $arrayElemAt: ['$durationParts', 1] } }, 60] },   // minutes
-              { $toInt: { $arrayElemAt: ['$durationParts', 2] } }                         // seconds
-            ]
+        const query = `
+          SELECT login, campusId, months
+          FROM ${locationStatsKeyspace}
+          ${campusFilter}
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        
+        // JavaScript'te işle
+        const locationStatsMap = new Map<string, number>();
+        
+        for (const row of result.rows as any[]) {
+          if (!row.months) continue;
+          
+          const months = row.months;
+          let totalSeconds = 0;
+          
+          for (const monthKey of Object.keys(months)) {
+            if (monthKey < threeMonthsAgoStr) continue;
+            
+            const monthData = months[monthKey];
+            if (!monthData || !monthData.totalDuration) continue;
+            
+            // HH:MM:SS formatından saniyeye çevir
+            const parts = monthData.totalDuration.split(':');
+            const seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+            totalSeconds += seconds;
+          }
+          
+          if (totalSeconds > 0) {
+            locationStatsMap.set(row.login, totalSeconds);
           }
         }
-      },
-      {
-        $group: {
-          _id: '$login',
-          totalDurationSeconds: { $sum: '$durationSeconds' }
-        }
-      },
-      {
-        $match: {
-          totalDurationSeconds: { $exists: true, $ne: null, $gt: 0 }
-        }
-      },
-      {
-        $sort: { totalDurationSeconds: -1 }
-      },
-      {
-        $limit: 5
-      },
-      {
-        $addFields: {
-          // Saniyeyi HH:MM:SS formatına geri çevir
-          hours: { $floor: { $divide: ['$totalDurationSeconds', 3600] } },
-          remainingSeconds: { $mod: ['$totalDurationSeconds', 3600] },
-        }
-      },
-      {
-        $addFields: {
-          minutes: { $floor: { $divide: ['$remainingSeconds', 60] } },
-          seconds: { $mod: ['$remainingSeconds', 60] }
-        }
-      },
-      {
-        $project: {
-          login: '$_id',
-          totalDuration: {
-            $concat: [
-              { $cond: [{ $lt: ['$hours', 10] }, { $concat: ['0', { $toString: '$hours' }] }, { $toString: '$hours' }] },
-              ':',
-              { $cond: [{ $lt: ['$minutes', 10] }, { $concat: ['0', { $toString: '$minutes' }] }, { $toString: '$minutes' }] },
-              ':',
-              { $cond: [{ $lt: ['$seconds', 10] }, { $concat: ['0', { $toString: '$seconds' }] }, { $toString: '$seconds' }] }
-            ]
-          },
-          totalDurationSeconds: 1
-        }
-      }
-      ]),
+        
+        // Top 5'i al ve formatla
+        const sorted = Array.from(locationStatsMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        
+        return sorted.map(([login, totalDurationSeconds]) => {
+          const hours = Math.floor(totalDurationSeconds / 3600);
+          const remainingSeconds = totalDurationSeconds % 3600;
+          const minutes = Math.floor(remainingSeconds / 60);
+          const seconds = remainingSeconds % 60;
+          
+          const formatTime = (num: number) => num < 10 ? `0${num}` : `${num}`;
+          
+          return {
+            login,
+            totalDuration: `${formatTime(hours)}:${formatTime(minutes)}:${formatTime(seconds)}`,
+            totalDurationSeconds
+          };
+        });
+      })(),
 
       // Tüm zamanlar en çok proje teslim edenler
-      Project.aggregate([
-        {
-          $match: {
-            ...campusFilter,
-            score: { $gt: 0 }
-          }
-        },
-        {
-          $group: {
-            _id: '$login',
-            projectCount: { $sum: 1 },
-            totalScore: { $sum: '$score' }
-          }
-        },
-        {
-          $sort: { projectCount: -1, totalScore: -1 }
-        },
-        {
-          $limit: 5
+      (async () => {
+        const campusFilter = campusId ? 'AND campusId = $campusId' : '';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
         }
-      ]),
+        const query = `
+          SELECT 
+            login AS _id,
+            COUNT(*) AS projectCount,
+            SUM(score) AS totalScore
+          FROM ${projectsKeyspace}
+          WHERE score > 0
+            ${campusFilter}
+          GROUP BY login
+          ORDER BY projectCount DESC, totalScore DESC
+          LIMIT 5
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        return result.rows;
+      })(),
 
       // Tüm zamanlar en yüksek wallet
-      Student.find({ 
-        ...campusFilter,
-        wallet: { $exists: true, $ne: null } 
-      })
-        .select('login wallet')
-        .sort({ wallet: -1 })
-        .limit(5)
-        .lean(),
+      (async () => {
+        const campusFilter = campusId ? 'WHERE campusId = $campusId' : 'WHERE wallet IS NOT NULL';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
+        }
+        const query = `
+          SELECT login, wallet
+          FROM ${studentsKeyspace}
+          ${campusFilter}
+            AND wallet IS NOT NULL
+          ORDER BY wallet DESC
+          LIMIT 5
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        return result.rows;
+      })(),
 
       // Tüm zamanlar en yüksek evaluation points
-      Student.find({ 
-        ...campusFilter,
-        correction_point: { $exists: true, $ne: null } 
-      })
-        .select('login correction_point')
-        .sort({ correction_point: -1 })
-        .limit(5)
-        .lean(),
+      (async () => {
+        const campusFilter = campusId ? 'WHERE campusId = $campusId' : 'WHERE correction_point IS NOT NULL';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
+        }
+        const query = `
+          SELECT login, correction_point
+          FROM ${studentsKeyspace}
+          ${campusFilter}
+            AND correction_point IS NOT NULL
+          ORDER BY correction_point DESC
+          LIMIT 5
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        return result.rows;
+      })(),
 
       // Tüm zamanlar en yüksek level
-      Student.find({ 
-        ...campusFilter,
-        level: { $exists: true, $ne: null } 
-      })
-        .select('login level')
-        .sort({ level: -1 })
-        .limit(5)
-        .lean(),
+      (async () => {
+        const campusFilter = campusId ? 'WHERE campusId = $campusId' : 'WHERE level IS NOT NULL';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
+        }
+        const query = `
+          SELECT login, level
+          FROM ${studentsKeyspace}
+          ${campusFilter}
+            AND level IS NOT NULL
+          ORDER BY level DESC
+          LIMIT 5
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        return result.rows;
+      })(),
 
       // Grade distribution
-      Student.aggregate([
-        {
-          $match: {
-            ...campusFilter,
-            'active?': true,
-            grade: { $exists: true, $ne: null, $nin: ['', null] }
-          }
-        },
-        {
-          $group: {
-            _id: '$grade',
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $sort: { _id: 1 }
-        },
-        {
-          $project: {
-            name: '$_id',
-            value: '$count',
-            _id: 0
-          }
+      (async () => {
+        const campusFilter = campusId ? 'AND campusId = $campusId' : '';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
         }
-      ]),
+        const query = `
+          SELECT 
+            grade AS name,
+            COUNT(*) AS value
+          FROM ${studentsKeyspace}
+          WHERE \`active?\` = true
+            AND grade IS NOT NULL
+            AND grade != ""
+            ${campusFilter}
+          GROUP BY grade
+          ORDER BY grade ASC
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        return result.rows;
+      })(),
 
       // Weekly occupancy - son 90 günün günlük ortalama doluluk verileri
-      LocationStats.aggregate([
-        {
-          $match: campusFilter
-        },
-        {
-          $project: {
-            login: 1,
-            monthsArray: { $objectToArray: '$months' }
-          }
-        },
-        {
-          $unwind: '$monthsArray'
-        },
-        {
-          $match: {
-            'monthsArray.k': { $gte: threeMonthsAgoStr }
-          }
-        },
-        {
-          $project: {
-            login: 1,
-            month: '$monthsArray.k',
-            daysArray: { $objectToArray: '$monthsArray.v.days' }
-          }
-        },
-        {
-          $unwind: '$daysArray'
-        },
-        {
-          $addFields: {
-            fullDate: {
-              $dateFromString: {
-                dateString: {
-                  $concat: [
-                    '$month',
-                    '-',
-                    { $cond: [{ $lt: [{ $strLenCP: '$daysArray.k' }, 2] }, { $concat: ['0', '$daysArray.k'] }, '$daysArray.k'] }
-                  ]
-                }
-              }
+      (async () => {
+        // N1QL'de object iteration için JavaScript kullan
+        const campusFilter = campusId ? 'WHERE campusId = $campusId' : '';
+        const queryParams: any = {};
+        if (campusId) {
+          queryParams.campusId = campusId;
+        }
+        const query = `
+          SELECT months
+          FROM ${locationStatsKeyspace}
+          ${campusFilter}
+        `;
+        const result = await executeQuery(query, {
+          parameters: queryParams
+        });
+        
+        const dayOfWeekCounts: { [key: number]: number } = {};
+        
+        for (const row of result.rows as any[]) {
+          if (!row.months) continue;
+          
+          for (const monthKey of Object.keys(row.months)) {
+            if (monthKey < threeMonthsAgoStr) continue;
+            
+            const monthData = row.months[monthKey];
+            if (!monthData || !monthData.days) continue;
+            
+            for (const day of Object.keys(monthData.days)) {
+              const fullDate = `${monthKey}-${String(day).padStart(2, '0')}`;
+              const date = new Date(fullDate);
+              const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+              
+              dayOfWeekCounts[dayOfWeek] = (dayOfWeekCounts[dayOfWeek] || 0) + 1;
             }
           }
-        },
-        {
-          $addFields: {
-            dayOfWeek: { $dayOfWeek: '$fullDate' }
-          }
-        },
-        {
-          $group: {
-            _id: '$dayOfWeek',
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $project: {
-            dayOfWeek: '$_id',
-            avgOccupancy: '$count',
-            _id: 0
-          }
-        },
-        {
-          $sort: { dayOfWeek: 1 }
         }
-      ])
+        
+        return Object.keys(dayOfWeekCounts).map(dayOfWeek => ({
+          dayOfWeek: parseInt(dayOfWeek),
+          avgOccupancy: dayOfWeekCounts[parseInt(dayOfWeek)]
+        })).sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+      })()
     ]);
 
     // TÜM LOGİNLERİ TOPLA (tekrarsız)
     const allLogins = new Set<string>();
     
-    topProjectSubmitters.forEach((s: { _id: string }) => allLogins.add(s._id));
-    topLocationStats.forEach((s: { login: string }) => allLogins.add(s.login));
-    allTimeProjects.forEach((s: { _id: string }) => allLogins.add(s._id));
-    allTimeWallet.forEach((s: Record<string, unknown>) => allLogins.add(s.login as string));
-    allTimePoints.forEach((s: Record<string, unknown>) => allLogins.add(s.login as string));
-    allTimeLevels.forEach((s: Record<string, unknown>) => allLogins.add(s.login as string));
+    topProjectSubmitters.forEach((s: any) => allLogins.add(s._id));
+    topLocationStats.forEach((s: any) => allLogins.add(s.login));
+    allTimeProjects.forEach((s: any) => allLogins.add(s._id));
+    allTimeWallet.forEach((s: any) => allLogins.add(s.login));
+    allTimePoints.forEach((s: any) => allLogins.add(s.login));
+    allTimeLevels.forEach((s: any) => allLogins.add(s.login));
 
     const uniqueLogins = Array.from(allLogins);
 
     // TEK SEFERDE TÜM STUDENT BİLGİLERİNİ ÇEK - SADECE GEREKEN BİLGİLER
     const [allStudents, allPatronage, allProjects, allFeedbacks] = await Promise.all([
-      Student.find({ login: { $in: uniqueLogins } })
-        .select('login displayname image correction_point wallet grade level has_cheats cheat_count')
-        .lean(),
-      Patronage.find({ login: { $in: uniqueLogins } })
-        .select('login godfathers children')
-        .lean(),
+      (async () => {
+        if (uniqueLogins.length === 0) return [];
+        const placeholders = uniqueLogins.map((_, i) => `$login${i}`).join(', ');
+        const query = `
+          SELECT login, displayname, image, correction_point, wallet, grade, level, has_cheats, cheat_count
+          FROM ${studentsKeyspace}
+          WHERE login IN [${placeholders}]
+        `;
+        const params: any = {};
+        uniqueLogins.forEach((login, i) => {
+          params[`login${i}`] = login;
+        });
+        const result = await executeQuery(query, { parameters: params });
+        return result.rows;
+      })(),
+      (async () => {
+        if (uniqueLogins.length === 0) return [];
+        const placeholders = uniqueLogins.map((_, i) => `$login${i}`).join(', ');
+        const query = `
+          SELECT login, godfathers, children
+          FROM ${patronagesKeyspace}
+          WHERE login IN [${placeholders}]
+        `;
+        const params: any = {};
+        uniqueLogins.forEach((login, i) => {
+          params[`login${i}`] = login;
+        });
+        const result = await executeQuery(query, { parameters: params });
+        return result.rows;
+      })(),
       // Sadece top 3 projeyi al her öğrenci için (dashboard'da çok proje göstermiyoruz)
-      Project.aggregate([
-        { $match: { login: { $in: uniqueLogins } } },
-        { $sort: { date: -1, score: -1 } },
-        {
-          $group: {
-            _id: '$login',
-            projects: { 
-              $push: { 
-                project: '$project', 
-                score: '$score', 
-                status: '$status', 
-                date: '$date' 
-              } 
-            }
+      (async () => {
+        if (uniqueLogins.length === 0) return [];
+        // N1QL'de array slice için JavaScript kullan
+        const placeholders = uniqueLogins.map((_, i) => `$login${i}`).join(', ');
+        const query = `
+          SELECT login, project, score, status, date
+          FROM ${projectsKeyspace}
+          WHERE login IN [${placeholders}]
+          ORDER BY login, date DESC, score DESC
+        `;
+        const params: any = {};
+        uniqueLogins.forEach((login, i) => {
+          params[`login${i}`] = login;
+        });
+        const result = await executeQuery(query, { parameters: params });
+        
+        // Group by login and take top 3
+        const grouped: { [key: string]: any[] } = {};
+        for (const row of result.rows as any[]) {
+          if (!grouped[row.login]) {
+            grouped[row.login] = [];
           }
-        },
-        {
-          $project: {
-            login: '$_id',
-            projects: { $slice: ['$projects', 3] },
-            _id: 0
+          if (grouped[row.login].length < 3) {
+            grouped[row.login].push({
+              project: row.project,
+              score: row.score,
+              status: row.status,
+              date: row.date
+            });
           }
         }
-      ]),
-      Feedback.find({ login: { $in: uniqueLogins } })
-        .select('login rating ratingDetails')
-        .lean()
+        
+        return Object.keys(grouped).map(login => ({
+          login,
+          projects: grouped[login]
+        }));
+      })(),
+      (async () => {
+        if (uniqueLogins.length === 0) return [];
+        const placeholders = uniqueLogins.map((_, i) => `$login${i}`).join(', ');
+        const query = `
+          SELECT login, rating, ratingDetails
+          FROM ${feedbacksKeyspace}
+          WHERE login IN [${placeholders}]
+        `;
+        const params: any = {};
+        uniqueLogins.forEach((login, i) => {
+          params[`login${i}`] = login;
+        });
+        const result = await executeQuery(query, { parameters: params });
+        return result.rows;
+      })()
     ]);
 
     // Patronage ve Feedback'leri merge et

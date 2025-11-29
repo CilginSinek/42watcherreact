@@ -1,53 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import mongoose from 'mongoose';
-import { Student, Project, LocationStats, Feedback } from '../models/Student.js';
-
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define MONGODB_URI environment variable');
-}
-
-interface CachedConnection {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-}
-
-declare global {
-  var mongoose: CachedConnection | undefined;
-}
-
-const cached: CachedConnection = global.mongoose || { conn: null, promise: null };
-
-if (!global.mongoose) {
-  global.mongoose = cached;
-}
-
-async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
-    });
-  }
-
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
-
-  return cached.conn;
-}
+import { executeQuery, getKeyspace } from '../../utils/couchbase.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -103,8 +55,6 @@ export default async function handler(
   }
 
   try {
-    await connectDB();
-
     // Vercel dynamic route: /api/students/[login] -> req.query.login
     const loginParam = req.query.login;
     const login = Array.isArray(loginParam) ? loginParam[0] : loginParam;
@@ -113,47 +63,59 @@ export default async function handler(
       return res.status(400).json({ error: 'Login parameter is required' });
     }
 
-    // Student bilgisini getir (case-insensitive search)
-    const student = await Student.findOne({ 
-      login: { $regex: new RegExp(`^${login}$`, 'i') } 
-    }).lean();
+    const studentsKeyspace = getKeyspace('students');
+    const projectsKeyspace = getKeyspace('projects');
+    const locationStatsKeyspace = getKeyspace('locationstats');
+    const feedbacksKeyspace = getKeyspace('feedbacks');
 
-    if (!student) {
+    // Student bilgisini getir (case-insensitive search)
+    const studentQuery = `
+      SELECT *
+      FROM ${studentsKeyspace}
+      WHERE LOWER(login) = LOWER($login)
+      LIMIT 1
+    `;
+
+    const studentResult = await executeQuery(studentQuery, {
+      parameters: { login }
+    });
+
+    if (!studentResult.rows || studentResult.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found', login });
     }
 
+    const student = studentResult.rows[0] as any;
+
     // Student'a ait projeleri getir - TÜM PROJELERİ
-    const projects = await Project.find({ login })
-      .select('project score date status')
-      .sort({ date: -1 })
-      .lean();
+    const projectsQuery = `
+      SELECT project, score, date, status
+      FROM ${projectsKeyspace}
+      WHERE login = $login
+      ORDER BY date DESC
+    `;
 
-    // Location stats (kullanılmıyor ama ileride lazım olabilir)
-    // const locationStats = await LocationStats.find({ login })
-    //   .select('month duration location')
-    //   .sort({ month: -1 })
-    //   .limit(12)
-    //   .lean();
+    const projectsResult = await executeQuery(projectsQuery, {
+      parameters: { login }
+    });
 
-    // Feedback bilgisi (kullanılmıyor ama ileride lazım olabilir)
-    // const feedbacks = await Feedback.find({ login })
-    //   .select('rating comment date')
-    //   .sort({ date: -1 })
-    //   .limit(10)
-    //   .lean();
+    const projects = projectsResult.rows as any[];
 
-    const feedbackCount = await Feedback.countDocuments({ login });
-    const avgRatingResult = await Feedback.aggregate([
-      { $match: { login } },
-      {
-        $group: {
-          _id: null,
-          avgRating: { $avg: '$rating' }
-        }
-      }
-    ]);
+    // Feedback count and average rating
+    const feedbackQuery = `
+      SELECT 
+        COUNT(*) AS feedbackCount,
+        AVG(rating) AS avgRating
+      FROM ${feedbacksKeyspace}
+      WHERE login = $login
+    `;
 
-    const avgRating = avgRatingResult.length > 0 ? avgRatingResult[0].avgRating : 0;
+    const feedbackResult = await executeQuery(feedbackQuery, {
+      parameters: { login }
+    });
+
+    const feedbackData = feedbackResult.rows[0] as any;
+    const feedbackCount = feedbackData?.feedbackCount || 0;
+    const avgRating = feedbackData?.avgRating || 0;
 
     // Project count hesapla
     const project_count = projects.length;
@@ -169,7 +131,19 @@ export default async function handler(
     const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
     const twoMonthsAgoStr = `${twoMonthsAgo.getFullYear()}-${String(twoMonthsAgo.getMonth() + 1).padStart(2, '0')}`;
     
-    const locationStatsDoc = await LocationStats.findOne({ login });
+    // LocationStats getir
+    const locationStatsQuery = `
+      SELECT *
+      FROM ${locationStatsKeyspace}
+      WHERE login = $login
+      LIMIT 1
+    `;
+
+    const locationStatsResult = await executeQuery(locationStatsQuery, {
+      parameters: { login }
+    });
+
+    const locationStatsDoc = locationStatsResult.rows.length > 0 ? locationStatsResult.rows[0] as any : null;
     
     const logTimes: Array<{ date: string; duration: number }> = [];
     
@@ -179,8 +153,10 @@ export default async function handler(
       console.log('LocationStats has months:', !!locationStatsDoc.months);
       
       if (locationStatsDoc.months) {
-        // Map size'ı kontrol et
-        console.log('Months Map size:', locationStatsDoc.months.size);
+        // Couchbase'de months bir object olarak gelir (Map değil)
+        const monthsObj = locationStatsDoc.months || {};
+        const monthsKeys = Object.keys(monthsObj);
+        console.log('Months object keys:', monthsKeys.length);
         
         // 90 gün önceyi bir kez hesapla (quarterly için)
         const ninetyDaysAgo = new Date();
@@ -189,14 +165,17 @@ export default async function handler(
         
         // Son 3 ayın verilerini al
         [twoMonthsAgoStr, lastMonthStr, currentMonth].forEach(monthKey => {
-          const monthData = locationStatsDoc.months.get(monthKey);
+          const monthData = monthsObj[monthKey];
           console.log(`Month ${monthKey} data:`, !!monthData);
           
           if (monthData && monthData.days) {
-            console.log(`Month ${monthKey} days size:`, monthData.days.size);
+            const daysObj = monthData.days || {};
+            const daysKeys = Object.keys(daysObj);
+            console.log(`Month ${monthKey} days size:`, daysKeys.length);
             
             let dayCount = 0;
-            monthData.days.forEach((duration: string, day: string) => {
+            daysKeys.forEach((day: string) => {
+              const duration = daysObj[day];
               // monthKey: "2025-10", day: "15" -> "2025-10-15"
               const fullDate = `${monthKey}-${String(day).padStart(2, '0')}`;
               const date = new Date(fullDate);
@@ -226,10 +205,16 @@ export default async function handler(
     const dayStats: { [key: number]: { totalSeconds: number; count: number } } = {};
     
     if (locationStatsDoc && locationStatsDoc.months) {
-      locationStatsDoc.months.forEach((monthData: { days?: Map<string, string>; totalDuration?: string }) => {
-        if (monthData.days) {
-          monthData.days.forEach((duration: string, day: string) => {
-            const date = new Date(day);
+      const monthsObj = locationStatsDoc.months || {};
+      Object.keys(monthsObj).forEach((monthKey: string) => {
+        const monthData = monthsObj[monthKey];
+        if (monthData && monthData.days) {
+          const daysObj = monthData.days || {};
+          Object.keys(daysObj).forEach((day: string) => {
+            const duration = daysObj[day];
+            // monthKey ve day'den tam tarih oluştur
+            const fullDate = `${monthKey}-${String(day).padStart(2, '0')}`;
+            const date = new Date(fullDate);
             const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
           
             // Duration HH:MM:SS formatından saniyeye çevir

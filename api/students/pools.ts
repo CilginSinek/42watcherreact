@@ -1,53 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import mongoose from 'mongoose';
-import { Student } from '../models/Student.js';
-
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define MONGODB_URI environment variable');
-}
-
-interface CachedConnection {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-}
-
-declare global {
-  var mongoose: CachedConnection | undefined;
-}
-
-const cached: CachedConnection = global.mongoose || { conn: null, promise: null };
-
-if (!global.mongoose) {
-  global.mongoose = cached;
-}
-
-async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
-    });
-  }
-
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
-
-  return cached.conn;
-}
+import { executeQuery, getKeyspace } from '../../utils/couchbase.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -72,37 +24,29 @@ export default async function handler(
   }
 
   try {
-    await connectDB();
+    const studentsKeyspace = getKeyspace('students');
 
-    // Get unique pool_month and pool_year combinations
-    const pools = await Student.aggregate([
-      {
-        $match: {
-          pool_month: { $exists: true, $ne: null },
-          pool_year: { $exists: true, $ne: null }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            month: '$pool_month',
-            year: '$pool_year'
-          },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          month: '$_id.month',
-          year: '$_id.year',
-          count: 1
-        }
-      },
-      {
-        $sort: { year: -1, month: -1 }
-      }
-    ]);
+    // Get unique pool_month and pool_year combinations using N1QL
+    const query = `
+      SELECT 
+        pool_month AS month,
+        pool_year AS year,
+        COUNT(*) AS count
+      FROM ${studentsKeyspace}
+      WHERE pool_month IS NOT NULL 
+        AND pool_month != ""
+        AND pool_year IS NOT NULL 
+        AND pool_year != ""
+      GROUP BY pool_month, pool_year
+      ORDER BY pool_year DESC, pool_month DESC
+    `;
+
+    const result = await executeQuery(query);
+    const pools = result.rows.map((row: any) => ({
+      month: row.month,
+      year: row.year,
+      count: row.count
+    }));
 
     return res.status(200).json({ pools });
   } catch (error) {
