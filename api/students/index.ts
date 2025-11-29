@@ -253,7 +253,27 @@ export default async function handler(
       sortValue: row.sortValue
     }));
 
-    // Calculate sort values for complex fields
+    // Calculate sort values for complex fields - OPTIMIZED: Only fetch for filtered students
+    const studentLogins = studentsWithSort.map(s => s.login);
+    if (studentLogins.length === 0) {
+      return res.status(200).json({
+        students: [],
+        pagination: {
+          total: 0,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: 0
+        }
+      });
+    }
+
+    // Build login parameters for WHERE IN clause
+    const loginParamsForSort: any = {};
+    const loginPlaceholdersForSort = studentLogins.map((_, i) => `$loginSort${i}`).join(', ');
+    studentLogins.forEach((login, i) => {
+      loginParamsForSort[`loginSort${i}`] = login;
+    });
+
     if (actualSortField === 'projectCount' || actualSortField === 'cheatCount') {
       const projectStatsQuery = `
         SELECT 
@@ -261,9 +281,12 @@ export default async function handler(
           SUM(CASE WHEN status = "success" THEN 1 ELSE 0 END) AS projectCount,
           SUM(CASE WHEN status = "fail" AND score = -42 THEN 1 ELSE 0 END) AS cheatCount
         FROM ${projectsKeyspace}
+        WHERE login IN [${loginPlaceholdersForSort}]
         GROUP BY login
       `;
-      const projectStatsResult = await executeQuery(projectStatsQuery);
+      const projectStatsResult = await executeQuery(projectStatsQuery, {
+        parameters: loginParamsForSort
+      });
       const statsMap = new Map<string, { projectCount: number; cheatCount: number }>();
       for (const row of projectStatsResult.rows as any[]) {
         statsMap.set(row.login, { projectCount: row.projectCount || 0, cheatCount: row.cheatCount || 0 });
@@ -281,8 +304,11 @@ export default async function handler(
           ARRAY_LENGTH(COALESCE(godfathers, [])) AS godfatherCount,
           ARRAY_LENGTH(COALESCE(children, [])) AS childrenCount
         FROM ${patronagesKeyspace}
+        WHERE login IN [${loginPlaceholdersForSort}]
       `;
-      const patronageResult = await executeQuery(patronageQuery);
+      const patronageResult = await executeQuery(patronageQuery, {
+        parameters: loginParamsForSort
+      });
       const statsMap = new Map<string, { godfatherCount: number; childrenCount: number }>();
       for (const row of patronageResult.rows as any[]) {
         statsMap.set(row.login, { godfatherCount: row.godfatherCount || 0, childrenCount: row.childrenCount || 0 });
@@ -297,8 +323,11 @@ export default async function handler(
       const locationQuery = `
         SELECT login, months
         FROM ${locationStatsKeyspace}
+        WHERE login IN [${loginPlaceholdersForSort}]
       `;
-      const locationResult = await executeQuery(locationQuery);
+      const locationResult = await executeQuery(locationQuery, {
+        parameters: loginParamsForSort
+      });
       const logTimeMap = new Map<string, number>();
       for (const row of locationResult.rows as any[]) {
         if (!row.months) continue;
@@ -323,9 +352,12 @@ export default async function handler(
           COUNT(*) AS feedbackCount,
           AVG(rating) AS avgRating
         FROM ${feedbacksKeyspace}
+        WHERE login IN [${loginPlaceholdersForSort}]
         GROUP BY login
       `;
-      const feedbackResult = await executeQuery(feedbackQuery);
+      const feedbackResult = await executeQuery(feedbackQuery, {
+        parameters: loginParamsForSort
+      });
       const feedbackMap = new Map<string, { feedbackCount: number; avgRating: number }>();
       for (const row of feedbackResult.rows as any[]) {
         feedbackMap.set(row.login, { 
