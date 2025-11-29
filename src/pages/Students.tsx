@@ -11,12 +11,12 @@ interface Student {
   displayname: string;
   email: string;
   image: {
-    link: string;
+    link?: string;
     versions: {
-      large: string;
-      medium: string;
-      small: string;
-      micro: string;
+      large?: string;
+      medium?: string;
+      small?: string;
+      micro?: string;
     };
   };
   correction_point: number;
@@ -331,7 +331,7 @@ function Students() {
                 >
                   <div className="flex gap-4 flex-col sm:flex-row">
                     <img
-                      src={student.image.versions.medium || "/placeholder.svg"}
+                      src={student.image.versions?.medium || "/placeholder.svg"}
                       alt={student.login}
                       className="w-16 h-16 rounded-xl object-cover shadow-md group-hover:scale-105 transition-transform duration-300 shrink-0"
                     />
