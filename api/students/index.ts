@@ -525,7 +525,24 @@ export default async function handler(
     }
 
     // Build students array with all calculated fields
-    const students = (studentsData.rows as any[]).map((student: any) => {
+    const students = (studentsData.rows as any[]).map((row: any) => {
+      // Couchbase'den gelen bazı document'ler iç içe "students" key'i içerebilir
+      // Eğer row.students varsa ve içinde login varsa, onu kullan
+      // Yoksa direkt row'u student olarak kullan
+      let student: any;
+      
+      if (row.students && typeof row.students === 'object' && row.students.login) {
+        // Row'un kendisi sadece "students" key'i içeriyor, içindeki objeyi kullan
+        student = { ...row.students };
+      } else {
+        // Row direkt student objesi veya başka bir yapı
+        student = { ...row };
+        // Eğer içinde nested "students" key'i varsa onu kaldır
+        if (student.students && typeof student.students === 'object') {
+          delete student.students;
+        }
+      }
+      
       const login = student.login;
       const projects = projectsMap.get(login) || [];
       const stats = projectStatsMap.get(login) || { projectCount: 0, cheatCount: 0 };
