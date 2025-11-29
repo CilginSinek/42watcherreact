@@ -643,7 +643,6 @@ export default async function handler(
     
     // Son 4 haftayı oluştur
     const weeklyCounts: { [key: number]: number } = {};
-    const now = new Date();
     
     // Her projeyi haftasına göre say
     for (const row of performanceResult.rows as any[]) {
