@@ -38,14 +38,15 @@
 - CSS3 (Styling)
 
 **Backend:**
-- Vercel Serverless Functions (Node.js)
-- MongoDB Atlas (Database)
-- Mongoose 8.19.2 (ODM)
+- Vercel Serverless Functions (Node.js) - Only for OAuth
+- External API for data
 - 42 API Integration
 
 **Authentication:**
 - 42 OAuth 2.0
 - Secure token handling with serverless functions
+
+**Note:** This is a frontend-only application. You need to provide your own backend API.
 
 ### 📦 Installation
 
@@ -73,7 +74,9 @@ VITE_REDIRECT_URI=http://localhost:5173/callback
 FORTYTWO_CLIENT_ID=your_42_client_id
 FORTYTWO_CLIENT_SECRET=your_42_client_secret
 FORTYTWO_REDIRECT_URI=http://localhost:5173/callback
-MONGODB_URI=your_mongodb_connection_string
+
+# External Backend API URL
+VITE_API_URL=https://your-backend-api.com
 ```
 
 4. **Run development server**
@@ -98,14 +101,8 @@ This project is configured for Vercel deployment:
 ├── api/                      # Serverless functions
 │   ├── auth/
 │   │   └── callback.ts      # OAuth token exchange
-│   ├── user/
-│   │   └── me.ts            # User profile endpoint
-│   ├── students/
-│   │   └── index.ts         # Students API with filters
-│   ├── cheats/
-│   │   └── index.ts         # Cheat detection API
-│   └── models/
-│       └── Student.ts       # MongoDB schemas
+│   └── user/
+│       └── me.ts            # User profile endpoint
 ├── src/
 │   ├── components/          # React components
 │   │   └── ProtectedRoute.tsx
@@ -186,14 +183,15 @@ Made with ❤️ by [sinek.dev](https://sinek.dev)
 - CSS3 (Stil)
 
 **Backend:**
-- Vercel Serverless Functions (Node.js)
-- MongoDB Atlas (Veritabanı)
-- Mongoose 8.19.2 (ODM)
+- Vercel Serverless Functions (Node.js) - Sadece OAuth için
+- Veri için harici API
 - 42 API Entegrasyonu
 
 **Kimlik Doğrulama:**
 - 42 OAuth 2.0
 - Serverless fonksiyonlar ile güvenli token yönetimi
+
+**Not:** Bu sadece frontend bir uygulamadır. Kendi backend API'nizi sağlamanız gerekir.
 
 ### 📦 Kurulum
 
@@ -221,7 +219,9 @@ VITE_REDIRECT_URI=http://localhost:5173/callback
 FORTYTWO_CLIENT_ID=42_client_id
 FORTYTWO_CLIENT_SECRET=42_client_secret
 FORTYTWO_REDIRECT_URI=http://localhost:5173/callback
-MONGODB_URI=mongodb_baglanti_metni
+
+# Harici Backend API URL
+VITE_API_URL=https://sizin-backend-api.com
 ```
 
 4. **Geliştirme sunucusunu başlatın**
@@ -246,14 +246,8 @@ Bu proje Vercel deploy'u için yapılandırılmıştır:
 ├── api/                      # Serverless fonksiyonlar
 │   ├── auth/
 │   │   └── callback.ts      # OAuth token değişimi
-│   ├── user/
-│   │   └── me.ts            # Kullanıcı profil endpoint'i
-│   ├── students/
-│   │   └── index.ts         # Filtreli öğrenci API'si
-│   ├── cheats/
-│   │   └── index.ts         # Kopya tespit API'si
-│   └── models/
-│       └── Student.ts       # MongoDB şemaları
+│   └── user/
+│       └── me.ts            # Kullanıcı profil endpoint'i
 ├── src/
 │   ├── components/          # React bileşenleri
 │   │   └── ProtectedRoute.tsx

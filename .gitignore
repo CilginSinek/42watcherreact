@@ -33,3 +33,4 @@ src/mockData.ts
 *.sw?
 
 .vercel
+API_SCHEMA.md
