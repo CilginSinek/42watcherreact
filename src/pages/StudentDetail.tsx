@@ -31,7 +31,7 @@ interface Student {
   project_count?: number;
   has_cheats?: boolean;
   cheat_count?: number;
-  projects?: Array<{ project: string; score: number; date: string; status: string }>;
+  projects?: Array<{ project: string; score: number; date: string; status: string; penaltyDate?: string }>;
   patronage?: { godfathers?: Array<{ login: string }>; children?: Array<{ login: string }> };
   feedbackCount?: number;
   avgRating?: number;
@@ -134,7 +134,7 @@ function StudentDetail() {
     if (activeTab === 'weekly') {
       return logTimesData.slice(-7).map(item => ({
         date: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }),
-        hours: Math.round(item.duration / 3600 * 10) / 10 // saniyeyi saate çevir
+        hours: Math.round((item.duration / 60) * 10) / 10 // dakikayı saate çevir
       }));
     }
     
@@ -144,7 +144,7 @@ function StudentDetail() {
       for (let i = 0; i < 4; i++) {
         const weekData = logTimesData.slice(i * 7, (i + 1) * 7);
         if (weekData.length > 0) {
-          const totalHours = weekData.reduce((sum, item) => sum + item.duration, 0) / 3600;
+          const totalHours = weekData.reduce((sum, item) => sum + item.duration, 0) / 60;
           weeks.push({ week: `Week ${i + 1}`, hours: Math.round(totalHours * 10) / 10 });
         }
       }
@@ -156,7 +156,7 @@ function StudentDetail() {
       const monthlyData: { [key: string]: number } = {};
       logTimesData.forEach(item => {
         const month = new Date(item.date).toLocaleDateString('en-US', { month: 'short' });
-        monthlyData[month] = (monthlyData[month] || 0) + item.duration / 3600;
+        monthlyData[month] = (monthlyData[month] || 0) + item.duration / 60;
       });
       return Object.entries(monthlyData).map(([month, hours]) => ({
         month,
@@ -175,14 +175,6 @@ function StudentDetail() {
       }))
     : [];
 
-  // Performance data - son projelerin ortalama skorlarından hesapla
-  const performanceData = student.projects && student.projects.length > 0
-    ? student.projects.slice(-4).map((project) => ({
-        month: formatDate(project.date),
-        performance: project.score
-      }))
-    : [];
-
   // Project stats - gerçek verilerden hesapla
   const successCount = student.projects?.filter(p => p.status === 'success').length || 0;
   const failCount = student.projects?.filter(p => p.status === 'fail').length || 0;
@@ -194,17 +186,19 @@ function StudentDetail() {
     { name: 'Failed', value: failCount, color: '#ef4444' }
   ].filter(stat => stat.value > 0); // Sadece 0'dan büyük olanları göster
 
-  // Total duration hesaplama
+  // Total duration hesaplama (duration dakika cinsinden geliyor)
   const getTotalDuration = () => {
     if (!logTimesData.length) return '0h';
-    const total = logTimesData.reduce((sum, item) => sum + item.duration, 0) / 3600;
-    return `${Math.round(total)}h`;
+    const totalMinutes = logTimesData.reduce((sum, item) => sum + item.duration, 0);
+    const hours = Math.round(totalMinutes / 60);
+    return `${hours}h`;
   };
 
   const getAvgDaily = () => {
     if (!logTimesData.length) return '0h';
-    const avg = logTimesData.reduce((sum, item) => sum + item.duration, 0) / 3600 / logTimesData.length;
-    return `${Math.round(avg)}h`;
+    const totalMinutes = logTimesData.reduce((sum, item) => sum + item.duration, 0);
+    const avgHours = Math.round((totalMinutes / 60) / logTimesData.length);
+    return `${avgHours}h`;
   };
 
   // Cheat projeleri filtrele (score === -42)
@@ -344,10 +338,12 @@ function StudentDetail() {
           </div>
         </div>
 
-        <div className="card mb-8">
-          <div className="mb-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              <h3 className="text-lg font-bold">📊 Log Times</h3>
+        {/* Log Times Chart - Sadece veri varsa göster */}
+        {logTimesData.length > 0 && (
+          <div className="card mb-8">
+            <div className="mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <h3 className="text-lg font-bold">📊 Log Times</h3>
               <div className="flex flex-wrap gap-4 md:gap-6">
                 <div style={{ backgroundColor: 'var(--bg-input)' }} className="px-4 py-2 rounded-lg">
                   <p className="text-(--text-tertiary) text-xs font-medium mb-1">Total Duration</p>
@@ -391,43 +387,31 @@ function StudentDetail() {
               <Line type="monotone" dataKey="hours" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6' }} />
             </LineChart>
           </ResponsiveContainer>
-        </div>
+          </div>
+        )}
 
-        <div className="card mb-8">
-          <h3 className="text-lg font-bold mb-6">📅 Average Attendance by Day</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={attendanceByDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="day" stroke="var(--text-tertiary)" />
-              <YAxis stroke="var(--text-tertiary)" />
-              <Tooltip 
-                contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
-                labelStyle={{ color: 'var(--text-primary)' }}
-                formatter={(value) => `${value}%`}
-              />
-              <Bar dataKey="percentage" fill="#06b6d4" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8">
-          <div className="card">
-            <h3 className="text-lg font-bold mb-6">Performance Trend</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={performanceData}>
+        {/* Attendance Chart - Sadece veri varsa göster */}
+        {attendanceByDay.length > 0 && (
+          <div className="card mb-8">
+            <h3 className="text-lg font-bold mb-6">📅 Average Attendance by Day</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={attendanceByDay}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" stroke="var(--text-tertiary)" />
+                <XAxis dataKey="day" stroke="var(--text-tertiary)" />
                 <YAxis stroke="var(--text-tertiary)" />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
                   labelStyle={{ color: 'var(--text-primary)' }}
+                  formatter={(value) => `${value}%`}
                 />
-                <Line type="monotone" dataKey="performance" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6' }} />
-              </LineChart>
+                <Bar dataKey="percentage" fill="#06b6d4" radius={[8, 8, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
+        )}
 
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 md:gap-8 mb-8">
           <div className="card">
             <h3 className="text-lg font-bold mb-6">Project Distribution</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -473,7 +457,7 @@ function StudentDetail() {
                       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                         <div className="flex-1">
                           <p className="font-semibold text-red-900 text-sm md:text-base">{project.project}</p>
-                          <p className="text-xs md:text-sm text-red-700">{formatDate(project.date)}</p>
+                          <p className="text-xs md:text-sm text-red-700">{formatDate(project.penaltyDate != undefined ? project.penaltyDate : project.date)}</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="px-3 py-1 bg-red-200 text-red-900 rounded-full text-xs md:text-sm font-medium">
