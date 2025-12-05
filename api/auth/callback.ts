@@ -1,4 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import connectDB from '../lib/mongodb';
+import { Session } from '../models/Session';
+import { encryptToken, generateSessionToken } from '../lib/crypto';
 
 export default async function handler(
   req: VercelRequest,
@@ -29,6 +32,9 @@ export default async function handler(
   }
 
   try {
+    // Connect to database
+    await connectDB();
+
     const response = await fetch('https://api.intra.42.fr/oauth/token', {
       method: 'POST',
       headers: {
@@ -43,17 +49,78 @@ export default async function handler(
       }),
     });
 
-    const data = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokenData = await response.json() as any;
 
     if (!response.ok) {
-      console.error('42 API Error:', data);
+      console.error('42 API Error:', tokenData);
       return res.status(response.status).json({ 
         error: 'Failed to exchange code for token',
-        details: data 
+        details: tokenData 
       });
     }
 
-    return res.status(200).json(data);
+    // Fetch user data from 42 API
+    const userResponse = await fetch('https://api.intra.42.fr/v2/me', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userData = await userResponse.json() as any;
+
+    if (!userResponse.ok) {
+      console.error('Failed to fetch user data:', userData);
+      return res.status(userResponse.status).json({ 
+        error: 'Failed to fetch user data',
+        details: userData 
+      });
+    }
+
+    // Get client IP
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
+                     (req.headers['x-real-ip'] as string) || 
+                     'unknown';
+
+    // Generate session token
+    const sessionToken = generateSessionToken();
+    
+    // Encrypt the access token
+    const encryptedAccessToken = encryptToken(tokenData.access_token);
+
+    // Create session with 30 days expiry
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const session = await Session.create({
+      sessionToken,
+      login: userData.login,
+      campusId: userData.campus_users?.[0]?.campus_id || 0,
+      userData: {
+        ...userData,
+        encryptedAccessToken,
+        tokenType: tokenData.token_type,
+        expiresIn: tokenData.expires_in,
+        refreshToken: tokenData.refresh_token ? encryptToken(tokenData.refresh_token) : undefined,
+      },
+      usedIps: [clientIp],
+      lastActivity: new Date(),
+      expiresAt,
+    });
+
+    return res.status(200).json({
+      sessionToken: session.sessionToken,
+      user: {
+        id: userData.id,
+        login: userData.login,
+        displayname: userData.displayname,
+        email: userData.email,
+        image: userData.image,
+        campus: userData.campus_users?.[0],
+      },
+      expiresAt: session.expiresAt,
+    });
   } catch (error) {
     console.error('Error exchanging code for token:', error);
     return res.status(500).json({ 
