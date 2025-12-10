@@ -143,7 +143,7 @@ function Dashboard() {
               {user && (
                 <div className="flex items-center gap-3">
                   <img src={user.image?.link || "/placeholder.svg"} alt={user.login} className="w-8 h-8 rounded-full object-cover" />
-                  <span className="text-(--text-secondary) text-sm">{user.login}</span>
+                  <span className="text-(--text-secondary) text-sm hidden sm:inline">{user.login}</span>
                   <button
                     onClick={logout}
                     className="btn-secondary py-1 px-3 text-sm"
