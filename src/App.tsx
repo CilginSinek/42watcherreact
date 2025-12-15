@@ -5,6 +5,7 @@ import StudentDetail from './pages/StudentDetail'
 import Reviews from './pages/Reviews'
 import Login from './pages/Login'
 import Callback from './pages/Callback'
+import Banned from './pages/Banned'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import KVKK from './pages/KVKK'
 import CookiePolicy from './pages/CookiePolicy'
@@ -51,6 +52,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/banned" element={<Banned />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/kvkk" element={<KVKK />} />
       <Route path="/cookie-policy" element={<CookiePolicy />} />

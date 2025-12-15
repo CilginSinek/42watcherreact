@@ -60,6 +60,7 @@ function Students() {
     studentsData ? (studentsData as { students: Student[] }).students : []
   );
   const [loading, setLoading] = useState(!studentsData);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [campusId, setCampusId] = useState('all');
@@ -81,7 +82,12 @@ function Students() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPools(response.data.pools);
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number; data?: { message?: string } } };
+      if (err.response?.status === 403 && err.response?.data?.message?.includes('banned')) {
+        const reason = err.response.data.message.replace('User is banned: ', '').replace('User is banned', '');
+        navigate('/banned', { state: { reason } });
+      }
       console.error('Error fetching pools:', error);
     }
   };
@@ -108,8 +114,17 @@ function Students() {
       setStudents(response.data.students);
       setPagination(response.data.pagination);
       setStudentsData(response.data);
-    } catch (error) {
-      console.error('Error fetching students:', error);
+      setError(null);
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number; data?: { message?: string } }; message?: string };
+      if (err.response?.status === 403 && err.response?.data?.message?.includes('banned')) {
+        const reason = err.response.data.message.replace('User is banned: ', '').replace('User is banned', '');
+        navigate('/banned', { state: { reason } });
+      } else {
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch students';
+        setError(errorMessage);
+        console.error('Error fetching students:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -322,6 +337,15 @@ function Students() {
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-10 h-10 rounded-full border-2 border-(--primary) border-t-transparent animate-spin mb-3"></div>
             <p className="text-(--text-secondary) text-sm">Loading students...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="text-6xl mb-4">⚠️</div>
+            <p className="text-red-500 font-semibold text-lg mb-2">Error Loading Students</p>
+            <p className="text-(--text-secondary) text-sm mb-4">{error}</p>
+            <button onClick={fetchStudents} className="btn-primary px-6 py-2">
+              Retry
+            </button>
           </div>
         ) : students.length > 0 ? (
           <>
