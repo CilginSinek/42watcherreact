@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCache } from '../contexts/useCache';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { StudentModal } from '../components/StudentModal';
@@ -45,6 +45,7 @@ interface DashboardData {
 function Dashboard() {
   const { user, logout, token } = useAuth();
   const { getDashboardCache, setDashboardCache } = useCache();
+  const navigate = useNavigate();
   const [campusId, setCampusId] = useState('all');
   const [data, setData] = useState<DashboardData | null>(getDashboardCache(campusId) as DashboardData | null);
   const [loading, setLoading] = useState(!getDashboardCache(campusId));
@@ -67,7 +68,12 @@ function Dashboard() {
       });
       setData(response.data);
       setDashboardCache(campusId, response.data);
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number; data?: { message?: string } } };
+      if (err.response?.status === 403 && err.response?.data?.message?.includes('banned')) {
+        const reason = err.response.data.message.replace('User is banned: ', '').replace('User is banned', '');
+        navigate('/banned', { state: { reason } });
+      }
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);

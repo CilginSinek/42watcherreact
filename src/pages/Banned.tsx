@@ -11,7 +11,7 @@ function Banned() {
     // Clear token and redirect after showing message
     const timer = setTimeout(() => {
       localStorage.removeItem('42_access_token');
-      navigate('/login');
+      window.location.href = '/login';
     }, 30000);
 
     return () => clearTimeout(timer);

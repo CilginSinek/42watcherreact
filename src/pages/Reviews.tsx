@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -48,6 +48,7 @@ interface PaginationInfo {
 
 function Reviews() {
   const { user, logout, token } = useAuth();
+  const navigate = useNavigate();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -87,7 +88,12 @@ function Reviews() {
       setProjectNames(projectsRes.data.projectNames || []);
       console.log('Statuses:', statusesRes.data);
       console.log('Project Names:', projectsRes.data);
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number; data?: { message?: string } } };
+      if (err.response?.status === 403 && err.response?.data?.message?.includes('banned')) {
+        const reason = err.response.data.message.replace('User is banned: ', '').replace('User is banned', '');
+        navigate('/banned', { state: { reason } });
+      }
       console.error('Error fetching metadata:', error);
     }
   };
@@ -117,7 +123,12 @@ function Reviews() {
       
       setReviews(response.data.reviews || []);
       setPagination(response.data.pagination);
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number; data?: { message?: string } } };
+      if (err.response?.status === 403 && err.response?.data?.message?.includes('banned')) {
+        const reason = err.response.data.message.replace('User is banned: ', '').replace('User is banned', '');
+        navigate('/banned', { state: { reason } });
+      }
       console.error('Error fetching reviews:', error);
     } finally {
       setLoading(false);

@@ -80,7 +80,12 @@ function StudentDetail() {
         } else {
           setError('Student not found');
         }
-      } catch (err) {
+      } catch (err: unknown) {
+        const error = err as { response?: { status: number; data?: { message?: string } } };
+        if (error.response?.status === 403 && error.response?.data?.message?.includes('banned')) {
+          const reason = error.response.data.message.replace('User is banned: ', '').replace('User is banned', '');
+          navigate('/banned', { state: { reason } });
+        }
         console.error('Error fetching student:', err);
         setError('Failed to load student details');
       } finally {
