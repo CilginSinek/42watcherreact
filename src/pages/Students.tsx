@@ -141,18 +141,22 @@ function Students() {
   useEffect(() => {
     if (!token) return;
 
-    const fetchData = async () => {
-      const cacheKey = `${campusId}-${status}-${poolMonth}-${poolYear}-${sortBy}-${order}-${search}-${pagination.page}`;
-      const cachedData = getStudentsCache(cacheKey);
-      
-      if (cachedData) {
-        const cached = cachedData as { students: Student[]; pagination: PaginationInfo };
-        setStudents(cached.students);
-        setPagination(cached.pagination);
-        setLoading(false);
-        return;
-      }
+    const cacheKey = `${campusId}-${status}-${poolMonth}-${poolYear}-${sortBy}-${order}-${search}-${pagination.page}`;
+    const cachedData = getStudentsCache(cacheKey);
+    
+    if (cachedData) {
+      const cached = cachedData as { students: Student[]; pagination: PaginationInfo };
+      setStudents(cached.students);
+      setPagination(prev => ({
+        ...prev,
+        total: cached.pagination.total,
+        totalPages: cached.pagination.totalPages
+      }));
+      setLoading(false);
+      return;
+    }
 
+    const fetchData = async () => {
       setLoading(true);
       try {
         const params = new URLSearchParams({
@@ -172,7 +176,11 @@ function Students() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setStudents(response.data.students);
-        setPagination(response.data.pagination);
+        setPagination(prev => ({
+          ...prev,
+          total: response.data.pagination.total,
+          totalPages: response.data.pagination.totalPages
+        }));
         setStudentsCache(cacheKey, response.data);
         setError(null);
       } catch (error: unknown) {
@@ -191,7 +199,8 @@ function Students() {
     };
 
     fetchData();
-  }, [token, campusId, status, poolMonth, poolYear, sortBy, order, search, pagination.page, pagination.limit, getStudentsCache, setStudentsCache, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, campusId, status, poolMonth, poolYear, sortBy, order, search, pagination.page]);
 
   // Scroll pozisyonunu restore et
   useEffect(() => {
