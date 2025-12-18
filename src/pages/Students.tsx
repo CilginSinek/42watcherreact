@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCache } from '../contexts/useCache';
 import { Link, useNavigate } from 'react-router-dom';
@@ -57,34 +57,47 @@ function Students() {
   const { getStudentsCache, setStudentsCache, getStudentsFilters, setStudentsFilters } = useCache();
   const navigate = useNavigate();
   
-  // Cache'den filter state'ini yükle
-  const cachedFilters = getStudentsFilters() as {
-    search?: string;
-    status?: string;
-    campusId?: string;
-    poolMonth?: string;
-    poolYear?: string;
-    sortBy?: string;
-    order?: 'asc' | 'desc';
-    page?: number;
-  } | null;
-  
+  // Cache'den filter state'ini yükle - useState lazy initialization ile
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState(cachedFilters?.search || '');
-  const [status, setStatus] = useState(cachedFilters?.status || 'all');
-  const [campusId, setCampusId] = useState(cachedFilters?.campusId || 'all');
-  const [poolMonth, setPoolMonth] = useState(cachedFilters?.poolMonth || '');
-  const [poolYear, setPoolYear] = useState(cachedFilters?.poolYear || '');
+  const [search, setSearch] = useState(() => {
+    const cached = getStudentsFilters() as { search?: string } | null;
+    return cached?.search || '';
+  });
+  const [status, setStatus] = useState(() => {
+    const cached = getStudentsFilters() as { status?: string } | null;
+    return cached?.status || 'all';
+  });
+  const [campusId, setCampusId] = useState(() => {
+    const cached = getStudentsFilters() as { campusId?: string } | null;
+    return cached?.campusId || 'all';
+  });
+  const [poolMonth, setPoolMonth] = useState(() => {
+    const cached = getStudentsFilters() as { poolMonth?: string } | null;
+    return cached?.poolMonth || '';
+  });
+  const [poolYear, setPoolYear] = useState(() => {
+    const cached = getStudentsFilters() as { poolYear?: string } | null;
+    return cached?.poolYear || '';
+  });
   const [pools, setPools] = useState<Pool[]>([]);
-  const [sortBy, setSortBy] = useState(cachedFilters?.sortBy || 'login');
-  const [order, setOrder] = useState<'asc' | 'desc'>(cachedFilters?.order || 'asc');
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    total: 0,
-    page: cachedFilters?.page || 1,
-    limit: 50,
-    totalPages: 0
+  const [sortBy, setSortBy] = useState(() => {
+    const cached = getStudentsFilters() as { sortBy?: string } | null;
+    return cached?.sortBy || 'login';
+  });
+  const [order, setOrder] = useState<'asc' | 'desc'>(() => {
+    const cached = getStudentsFilters() as { order?: 'asc' | 'desc' } | null;
+    return cached?.order || 'asc';
+  });
+  const [pagination, setPagination] = useState<PaginationInfo>(() => {
+    const cached = getStudentsFilters() as { page?: number } | null;
+    return {
+      total: 0,
+      page: cached?.page || 1,
+      limit: 50,
+      totalPages: 0
+    };
   });
 
   const fetchPools = async () => {
@@ -104,11 +117,11 @@ function Students() {
     }
   };
 
-  const getCacheKey = () => {
+  const getCacheKey = useCallback(() => {
     return `${campusId}-${status}-${poolMonth}-${poolYear}-${sortBy}-${order}-${search}-${pagination.page}`;
-  };
+  }, [campusId, status, poolMonth, poolYear, sortBy, order, search, pagination.page]);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -144,7 +157,7 @@ function Students() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, sortBy, order, search, status, campusId, poolMonth, poolYear, token, getCacheKey, setStudentsCache, navigate]);
 
   useEffect(() => {
     if (!token) return;
@@ -180,8 +193,7 @@ function Students() {
     } else {
       fetchStudents();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, sortBy, order, status, campusId, poolMonth, poolYear, token]);
+  }, [token, getCacheKey, getStudentsCache, fetchStudents]);
 
   // Scroll pozisyonunu restore et
   useEffect(() => {
