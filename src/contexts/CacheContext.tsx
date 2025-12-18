@@ -5,8 +5,15 @@ interface CacheContextType {
   dashboardCache: Record<string, unknown>;
   setDashboardCache: (campusId: string, data: unknown) => void;
   getDashboardCache: (campusId: string) => unknown;
-  studentsData: unknown;
-  setStudentsData: (data: unknown) => void;
+  studentsCache: Record<string, unknown>;
+  setStudentsCache: (key: string, data: unknown) => void;
+  getStudentsCache: (key: string) => unknown;
+  studentsFilters: unknown;
+  setStudentsFilters: (filters: unknown) => void;
+  getStudentsFilters: () => unknown;
+  reviewsCache: Record<string, unknown>;
+  setReviewsCache: (key: string, data: unknown) => void;
+  getReviewsCache: (key: string) => unknown;
   clearCache: () => void;
 }
 
@@ -15,7 +22,9 @@ export const CacheContext = createContext<CacheContextType | undefined>(undefine
 
 export function CacheProvider({ children }: { children: ReactNode }) {
   const [dashboardCache, setDashboardCacheState] = useState<Record<string, unknown>>({});
-  const [studentsData, setStudentsData] = useState<unknown>(null);
+  const [studentsCache, setStudentsCacheState] = useState<Record<string, unknown>>({});
+  const [studentsFilters, setStudentsFiltersState] = useState<unknown>(null);
+  const [reviewsCache, setReviewsCacheState] = useState<Record<string, unknown>>({});
 
   const setDashboardCache = (campusId: string, data: unknown) => {
     setDashboardCacheState(prev => ({ ...prev, [campusId]: data }));
@@ -25,9 +34,35 @@ export function CacheProvider({ children }: { children: ReactNode }) {
     return dashboardCache[campusId];
   };
 
+  const setStudentsCache = (key: string, data: unknown) => {
+    setStudentsCacheState(prev => ({ ...prev, [key]: data }));
+  };
+
+  const getStudentsCache = (key: string) => {
+    return studentsCache[key];
+  };
+
+  const setStudentsFilters = (filters: unknown) => {
+    setStudentsFiltersState(filters);
+  };
+
+  const getStudentsFilters = () => {
+    return studentsFilters;
+  };
+
+  const setReviewsCache = (key: string, data: unknown) => {
+    setReviewsCacheState(prev => ({ ...prev, [key]: data }));
+  };
+
+  const getReviewsCache = (key: string) => {
+    return reviewsCache[key];
+  };
+
   const clearCache = () => {
     setDashboardCacheState({});
-    setStudentsData(null);
+    setStudentsCacheState({});
+    setStudentsFiltersState(null);
+    setReviewsCacheState({});
   };
 
   return (
@@ -36,8 +71,15 @@ export function CacheProvider({ children }: { children: ReactNode }) {
         dashboardCache,
         setDashboardCache,
         getDashboardCache,
-        studentsData,
-        setStudentsData,
+        studentsCache,
+        setStudentsCache,
+        getStudentsCache,
+        studentsFilters,
+        setStudentsFilters,
+        getStudentsFilters,
+        reviewsCache,
+        setReviewsCache,
+        getReviewsCache,
         clearCache,
       }}
     >

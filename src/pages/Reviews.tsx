@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCache } from '../contexts/useCache';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -48,6 +49,7 @@ interface PaginationInfo {
 
 function Reviews() {
   const { user, logout, token } = useAuth();
+  const { getReviewsCache, setReviewsCache } = useCache();
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,10 @@ function Reviews() {
     limit: 50,
     totalPages: 0
   });
+
+  const getCacheKey = () => {
+    return `${search}-${projectName}-${campusId}-${evaluatorLogin}-${evaluatedLogin}-${score}-${status}-${dateFilter}-${dateFrom}-${dateTo}-${pagination.page}`;
+  };
 
   const fetchMetadata = async () => {
     try {
@@ -123,6 +129,7 @@ function Reviews() {
       
       setReviews(response.data.reviews || []);
       setPagination(response.data.pagination);
+      setReviewsCache(getCacheKey(), response.data);
     } catch (error: unknown) {
       const err = error as { response?: { status: number; data?: { message?: string } } };
       if (err.response?.status === 403 && err.response?.data?.message?.includes('banned')) {
@@ -143,7 +150,18 @@ function Reviews() {
 
   useEffect(() => {
     if (!token) return;
-    fetchReviews();
+    
+    const cacheKey = getCacheKey();
+    const cachedData = getReviewsCache(cacheKey);
+    
+    if (cachedData) {
+      const cached = cachedData as { reviews: Review[]; pagination: PaginationInfo };
+      setReviews(cached.reviews || []);
+      setPagination(cached.pagination);
+      setLoading(false);
+    } else {
+      fetchReviews();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, token]);
 

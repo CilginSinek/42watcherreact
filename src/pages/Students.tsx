@@ -54,26 +54,38 @@ interface PaginationInfo {
 
 function Students() {
   const { user, logout, token } = useAuth();
-  const { studentsData, setStudentsData } = useCache();
+  const { getStudentsCache, setStudentsCache, getStudentsFilters, setStudentsFilters } = useCache();
   const navigate = useNavigate();
-  const [students, setStudents] = useState<Student[]>(
-    studentsData ? (studentsData as { students: Student[] }).students : []
-  );
-  const [loading, setLoading] = useState(!studentsData);
+  
+  // Cache'den filter state'ini yükle
+  const cachedFilters = getStudentsFilters() as {
+    search?: string;
+    status?: string;
+    campusId?: string;
+    poolMonth?: string;
+    poolYear?: string;
+    sortBy?: string;
+    order?: 'asc' | 'desc';
+    page?: number;
+  } | null;
+  
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
-  const [campusId, setCampusId] = useState('all');
-  const [poolMonth, setPoolMonth] = useState('');
-  const [poolYear, setPoolYear] = useState('');
+  const [search, setSearch] = useState(cachedFilters?.search || '');
+  const [status, setStatus] = useState(cachedFilters?.status || 'all');
+  const [campusId, setCampusId] = useState(cachedFilters?.campusId || 'all');
+  const [poolMonth, setPoolMonth] = useState(cachedFilters?.poolMonth || '');
+  const [poolYear, setPoolYear] = useState(cachedFilters?.poolYear || '');
   const [pools, setPools] = useState<Pool[]>([]);
-  const [sortBy, setSortBy] = useState('login');
-  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
-  const [pagination, setPagination] = useState<PaginationInfo>(
-    studentsData 
-      ? (studentsData as { pagination: PaginationInfo }).pagination 
-      : { total: 0, page: 1, limit: 50, totalPages: 0 }
-  );
+  const [sortBy, setSortBy] = useState(cachedFilters?.sortBy || 'login');
+  const [order, setOrder] = useState<'asc' | 'desc'>(cachedFilters?.order || 'asc');
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    total: 0,
+    page: cachedFilters?.page || 1,
+    limit: 50,
+    totalPages: 0
+  });
 
   const fetchPools = async () => {
     try {
@@ -90,6 +102,10 @@ function Students() {
       }
       console.error('Error fetching pools:', error);
     }
+  };
+
+  const getCacheKey = () => {
+    return `${campusId}-${status}-${poolMonth}-${poolYear}-${sortBy}-${order}-${search}-${pagination.page}`;
   };
 
   const fetchStudents = async () => {
@@ -113,7 +129,7 @@ function Students() {
       });
       setStudents(response.data.students);
       setPagination(response.data.pagination);
-      setStudentsData(response.data);
+      setStudentsCache(getCacheKey(), response.data);
       setError(null);
     } catch (error: unknown) {
       const err = error as { response?: { status: number; data?: { message?: string } }; message?: string };
@@ -136,11 +152,47 @@ function Students() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Filtreleri cache'e kaydet
+  useEffect(() => {
+    setStudentsFilters({
+      search,
+      status,
+      campusId,
+      poolMonth,
+      poolYear,
+      sortBy,
+      order,
+      page: pagination.page
+    });
+  }, [search, status, campusId, poolMonth, poolYear, sortBy, order, pagination.page, setStudentsFilters]);
+
   useEffect(() => {
     if (!token) return;
-    fetchStudents();
+    
+    const cacheKey = getCacheKey();
+    const cachedData = getStudentsCache(cacheKey);
+    
+    if (cachedData) {
+      const cached = cachedData as { students: Student[]; pagination: PaginationInfo };
+      setStudents(cached.students);
+      setPagination(cached.pagination);
+      setLoading(false);
+    } else {
+      fetchStudents();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, sortBy, order, status, campusId, poolMonth, poolYear, token]);
+
+  // Scroll pozisyonunu restore et
+  useEffect(() => {
+    const savedScrollPos = sessionStorage.getItem('studentsScrollPos');
+    if (savedScrollPos && !loading) {
+      setTimeout(() => {
+        window.scrollTo(0, parseInt(savedScrollPos));
+        sessionStorage.removeItem('studentsScrollPos');
+      }, 100);
+    }
+  }, [loading]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +245,8 @@ function Students() {
   };
 
   const handleStudentClick = (student: Student) => {
+    // Scroll pozisyonunu kaydet
+    sessionStorage.setItem('studentsScrollPos', window.scrollY.toString());
     navigate(`/students/${student.login}`);
   };
 
