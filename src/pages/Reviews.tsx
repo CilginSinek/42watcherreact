@@ -75,6 +75,7 @@ function Reviews() {
     totalPages: 0
   });
   const [isInitialized, setIsInitialized] = useState(false);
+  const [searchTrigger, setSearchTrigger] = useState(0);
 
   // Initial load - cache'den filtreleri yükle (sadece mount'ta bir kez)
   useEffect(() => {
@@ -227,12 +228,12 @@ function Reviews() {
       fetchReviews();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, isInitialized, search, projectName, campusId, evaluatorLogin, evaluatedLogin, score, status, dateFilter, dateFrom, dateTo, pagination.page]);
+  }, [token, isInitialized, projectName, campusId, score, status, dateFilter, dateFrom, dateTo, pagination.page, searchTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPagination(prev => ({ ...prev, page: 1 }));
-    // useEffect otomatik olarak tetiklenecek
+    setSearchTrigger(prev => prev + 1);
   };
 
   const handleReset = () => {

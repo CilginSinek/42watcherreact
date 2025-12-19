@@ -76,6 +76,7 @@ function Students() {
     totalPages: 0
   });
   const [isInitialized, setIsInitialized] = useState(false);
+  const [searchTrigger, setSearchTrigger] = useState(0);
 
   // Initial load - cache'den filtreleri yükle (sadece mount'ta bir kez)
   useEffect(() => {
@@ -209,7 +210,7 @@ function Students() {
 
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, isInitialized, campusId, status, poolMonth, poolYear, sortBy, order, search, pagination.page]);
+  }, [token, isInitialized, campusId, status, poolMonth, poolYear, sortBy, order, pagination.page, searchTrigger]);
 
   // Scroll pozisyonunu restore et
   useEffect(() => {
@@ -225,7 +226,7 @@ function Students() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPagination(prev => ({ ...prev, page: 1 }));
-    // useEffect otomatik olarak tetiklenecek
+    setSearchTrigger(prev => prev + 1);
   };
 
   const handlePoolChange = (value: string) => {
