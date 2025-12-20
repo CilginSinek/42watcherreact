@@ -741,20 +741,50 @@ function Wrapped() {
     };
 
     const handleShare = async () => {
-        if (navigator.share) {
-            try {
+        if (!summaryRef.current) return;
+
+        try {
+            // Generate image
+            const dataUrl = await domToPng(summaryRef.current, {
+                scale: 2,
+                backgroundColor: null,
+            });
+
+            // Convert data URL to blob
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+
+            // Create file from blob
+            const file = new File([blob], `${login}-2025-wrapped.png`, { type: 'image/png' });
+
+            // Check if Web Share API with files is supported
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: `${data?.user?.displayname || login} - 2025 Wrapped`,
+                    text: data?.summary.shortDescription || '2025 yılımın özeti!',
+                    files: [file],
+                });
+            } else if (navigator.share) {
+                // Fallback: share without image
                 await navigator.share({
                     title: `${login} - 2025 Wrapped`,
                     text: data?.summary.shortDescription || '2025 yılımın özeti!',
                     url: window.location.href,
                 });
-            } catch {
-                // User cancelled or share failed
+            } else {
+                // Fallback: copy URL
+                await navigator.clipboard.writeText(window.location.href);
+                alert('Link kopyalandı! 🔗');
             }
-        } else {
-            // Fallback: copy URL
-            await navigator.clipboard.writeText(window.location.href);
-            alert('Link kopyalandı! 🔗');
+        } catch (err) {
+            console.error('Share failed:', err);
+            // Fallback: copy URL on error
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                alert('Link kopyalandı! 🔗');
+            } catch {
+                // Silent fail
+            }
         }
     };
 
@@ -900,14 +930,16 @@ function Wrapped() {
                 {slides.map((slide, index) => (
                     <div
                         key={index}
-                        className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 ease-out ${index === currentSlide
+                        className={`absolute inset-0 overflow-y-auto p-4 md:p-6 transition-all duration-500 ease-out ${index === currentSlide
                             ? 'opacity-100 translate-x-0'
                             : index < currentSlide
-                                ? 'opacity-0 -translate-x-full'
-                                : 'opacity-0 translate-x-full'
+                                ? 'opacity-0 -translate-x-full pointer-events-none'
+                                : 'opacity-0 translate-x-full pointer-events-none'
                             }`}
                     >
-                        {slide}
+                        <div className="min-h-full flex items-center justify-center py-4">
+                            {slide}
+                        </div>
                     </div>
                 ))}
             </div>
