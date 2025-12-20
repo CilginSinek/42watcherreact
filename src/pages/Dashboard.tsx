@@ -179,6 +179,31 @@ function Dashboard() {
           </div>
         ) : data ? (
           <>
+            {/* Wrapped Announcement Banner */}
+            {user && (
+              <div className="card mb-6 bg-linear-to-r from-purple-500/10 to-pink-500/10 border-2 border-purple-500/30">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="text-4xl">🎁</div>
+                    <div>
+                      <h3 className="text-lg font-bold text-(--text-primary) mb-1">
+                        Your 2024 Wrapped is Ready!
+                      </h3>
+                      <p className="text-(--text-secondary) text-sm">
+                        Check out your year in review and see your achievements
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to={`/students/${user.login}/wrapped`}
+                    className="btn-primary whitespace-nowrap bg-linear-to-r from-purple-500 to-pink-500 border-0"
+                  >
+                    View My Wrapped 🎉
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
               <div className="card">

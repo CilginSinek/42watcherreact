@@ -176,7 +176,9 @@ function StudentDetail() {
   };
 
   // Attendance verilerini dönüştür (API'den gelen avgHours zaten saat cinsinde)
-  const attendanceByDay = attendanceData.length > 0 
+  // Tüm günlerdeki saatler 0 ise gösterme
+  const hasNonZeroAttendance = attendanceData.length > 0 && attendanceData.some(item => item.avgHours > 0);
+  const attendanceByDay = hasNonZeroAttendance
     ? attendanceData.map(item => ({
         day: item.day,
         percentage: Math.min(100, Math.round((item.avgHours / 12) * 100)) // 12 saat = %100
@@ -316,6 +318,13 @@ function StudentDetail() {
                   >
                     View on 42 Intra →
                   </a>
+                  <button
+                    onClick={() => navigate(`/students/${student.login}/wrapped`)}
+                    style={{ background: 'linear-gradient(to right, rgb(168, 85, 247), rgb(236, 72, 153))' }}
+                    className="mt-2 ml-2 inline-block text-white px-4 py-2 rounded-lg hover:opacity-90 font-medium transition text-sm md:text-base"
+                  >
+                    🎁 2024 Wrapped
+                  </button>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-start md:justify-end w-full md:w-auto">
                   {student['alumni?'] && <span className="px-3 md:px-4 py-1 md:py-2 bg-green-100 text-green-700 rounded-full text-xs md:text-sm font-semibold">Alumni</span>}
@@ -420,6 +429,7 @@ function StudentDetail() {
         )}
 
         {/* Charts Grid */}
+        {(student.project_count || 0) > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 md:gap-8 mb-8">
           <div className="card">
             <h3 className="text-lg font-bold mb-6">Project Distribution</h3>
@@ -447,6 +457,7 @@ function StudentDetail() {
             </ResponsiveContainer>
           </div>
         </div>
+        )}
 
         {/* Info Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
