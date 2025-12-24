@@ -11,7 +11,7 @@ const Callback = () => {
 
   useEffect(() => {
     const code = searchParams.get('code');
-    
+
     if (!code) {
       setError('Authorization code not found');
       setIsProcessing(false);
@@ -20,10 +20,10 @@ const Callback = () => {
 
     const exchangeCodeForToken = async () => {
       try {
-        const response = await axios.post('/api/auth/callback', { code });
+        const response = await axios.post('/api/auth', { code });
         const { sessionToken } = response.data;
         localStorage.setItem('42_access_token', sessionToken);
-        
+
         setTimeout(() => {
           navigate('/', { replace: true });
           window.location.reload();
@@ -64,7 +64,7 @@ const Callback = () => {
   }
 
   return (
-      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
       <Snowfall style={{ position: 'fixed', width: '100vw', height: '100vh', zIndex: 9999 }} />
       <div className="flex flex-col items-center gap-3">
         <div className="w-12 h-12 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>

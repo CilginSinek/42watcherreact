@@ -672,7 +672,7 @@ function Wrapped() {
             setError(null);
             try {
                 const apiUrl = import.meta.env.VITE_API_URL || '';
-                const response = await axios.get(`${apiUrl}/api/students/wrapped/${login}`, {
+                const response = await axios.get(`${apiUrl}/api/students/${login}?action=wrapped`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
 
