@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import connectDB from '../lib/mongodb';
-import { Session } from '../models/Session';
+import { getSessionModel } from '../models/Session';
 
 export default async function handler(
   req: VercelRequest,
@@ -27,6 +27,9 @@ export default async function handler(
   try {
     await connectDB();
 
+    // Get Session model from DB2
+    const Session = getSessionModel();
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No session token provided' });
@@ -44,7 +47,7 @@ export default async function handler(
     return res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error('Error during logout:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
     });

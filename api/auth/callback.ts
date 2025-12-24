@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import connectDB from '../lib/mongodb.js';
-import { Session } from '../models/Session.js';
-import { encryptToken, generateSessionToken } from '../lib/crypto.js';
+import connectDB from '../lib/mongodb';
+import { getSessionModel } from '../models/Session';
+import { encryptToken, generateSessionToken } from '../lib/crypto';
 
 export default async function handler(
   req: VercelRequest,
@@ -35,6 +35,9 @@ export default async function handler(
     // Connect to database
     await connectDB();
 
+    // Get Session model from DB2
+    const Session = getSessionModel();
+
     const response = await fetch('https://api.intra.42.fr/oauth/token', {
       method: 'POST',
       headers: {
@@ -54,9 +57,9 @@ export default async function handler(
 
     if (!response.ok) {
       console.error('42 API Error:', tokenData);
-      return res.status(response.status).json({ 
+      return res.status(response.status).json({
         error: 'Failed to exchange code for token',
-        details: tokenData 
+        details: tokenData
       });
     }
 
@@ -72,20 +75,20 @@ export default async function handler(
 
     if (!userResponse.ok) {
       console.error('Failed to fetch user data:', userData);
-      return res.status(userResponse.status).json({ 
+      return res.status(userResponse.status).json({
         error: 'Failed to fetch user data',
-        details: userData 
+        details: userData
       });
     }
 
     // Get client IP
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
-                     (req.headers['x-real-ip'] as string) || 
-                     'unknown';
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+      (req.headers['x-real-ip'] as string) ||
+      'unknown';
 
     // Generate session token
     const sessionToken = generateSessionToken();
-    
+
     // Encrypt the access token
     const encryptedAccessToken = encryptToken(tokenData.access_token);
 
@@ -123,7 +126,7 @@ export default async function handler(
     });
   } catch (error) {
     console.error('Error exchanging code for token:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
     });

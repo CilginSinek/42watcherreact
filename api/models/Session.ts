@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getDB2Connection } from '../lib/mongodb';
 
 const sessionSchema = new mongoose.Schema({
   sessionToken: { type: String, required: true, unique: true, index: true },
@@ -13,5 +14,14 @@ const sessionSchema = new mongoose.Schema({
 
 // Index for automatic cleanup
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Index for user sessions by last activity
+sessionSchema.index({ login: 1, lastActivity: -1 });
 
+// This model uses DB2
+export function getSessionModel() {
+  const db2 = getDB2Connection();
+  return db2.models.Session || db2.model('Session', sessionSchema);
+}
+
+// For backwards compatibility - will use default mongoose connection
 export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);
