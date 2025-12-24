@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { getDB2Connection } from '../lib/mongodb';
+import { getDB2Connection } from '../_lib/mongodb';
 
 const bannedUserSchema = new mongoose.Schema({
     login: { type: String, required: true, unique: true, index: true },

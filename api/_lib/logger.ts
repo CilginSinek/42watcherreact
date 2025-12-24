@@ -1,5 +1,5 @@
 import type { VercelRequest } from '@vercel/node';
-import { getEventLogModel } from '../models/EventLog';
+import { getEventLogModel } from '../_models/EventLog';
 
 /**
  * Log API requests to EventLog (DB2)

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { getDB2Connection } from '../lib/mongodb';
+import { getDB2Connection } from '../_lib/mongodb';
 
 const projectReviewSchema = new mongoose.Schema({
     campusId: { type: Number, required: true, index: true },

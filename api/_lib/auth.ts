@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSessionModel } from '../models/Session';
-import { getBannedUserModel } from '../models/BannedUser';
+import { getSessionModel } from '../_models/Session';
+import { getBannedUserModel } from '../_models/BannedUser';
 
 export interface AuthenticatedRequest extends VercelRequest {
     user?: Record<string, unknown>;

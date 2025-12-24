@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import connectDB from '../lib/mongodb';
-import { getSessionModel } from '../models/Session';
-import { encryptToken, generateSessionToken } from '../lib/crypto';
+import connectDB from '../_lib/mongodb';
+import { getSessionModel } from '../_models/Session';
+import { encryptToken, generateSessionToken } from '../_lib/crypto';
 
 export default async function handler(
     req: VercelRequest,
@@ -29,7 +29,6 @@ export default async function handler(
         await connectDB();
         const Session = getSessionModel();
 
-        // Route based on action parameter
         const action = req.query.action as string || req.body?.action;
 
         // LOGOUT ACTION
@@ -58,9 +57,7 @@ export default async function handler(
 
         const response = await fetch('https://api.intra.42.fr/oauth/token', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 grant_type: 'authorization_code',
                 client_id: process.env.FORTYTWO_CLIENT_ID,
@@ -81,11 +78,8 @@ export default async function handler(
             });
         }
 
-        // Fetch user data from 42 API
         const userResponse = await fetch('https://api.intra.42.fr/v2/me', {
-            headers: {
-                Authorization: `Bearer ${tokenData.access_token}`,
-            },
+            headers: { Authorization: `Bearer ${tokenData.access_token}` },
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,18 +93,12 @@ export default async function handler(
             });
         }
 
-        // Get client IP
         const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
-            (req.headers['x-real-ip'] as string) ||
-            'unknown';
+            (req.headers['x-real-ip'] as string) || 'unknown';
 
-        // Generate session token
         const sessionToken = generateSessionToken();
-
-        // Encrypt the access token
         const encryptedAccessToken = encryptToken(tokenData.access_token);
 
-        // Create session with 30 days expiry
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
 
