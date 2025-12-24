@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { connectDB } from '../../lib/mongodb';
-import { Student } from '../../models/index';
-import { getProjectReviewModel } from '../../models/ProjectReview';
-import { validateCampusId } from '../../lib/validators';
-import { authenticate, setCorsHeaders, handleOptions, type AuthenticatedRequest } from '../../lib/auth';
+import { connectDB } from '../lib/mongodb';
+import { Student } from '../models/index';
+import { getProjectReviewModel } from '../models/ProjectReview';
+import { validateCampusId } from '../lib/validators';
+import { authenticate, setCorsHeaders, handleOptions, type AuthenticatedRequest } from '../lib/auth';
 
 /**
  * Validate and sanitize login string

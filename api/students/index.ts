@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { connectDB } from '../../lib/mongodb';
-import { Student, Project } from '../../models/index';
-import { validateCampusId, validateSearch, validatePool, validateStatus, validateSort, validateOrder, validateLimit } from '../../lib/validators';
-import { logEvent } from '../../lib/logger';
-import { authenticate, setCorsHeaders, handleOptions, type AuthenticatedRequest } from '../../lib/auth';
+import { connectDB } from '../lib/mongodb';
+import { Student, Project } from '../models/index';
+import { validateCampusId, validateSearch, validatePool, validateStatus, validateSort, validateOrder, validateLimit } from '../lib/validators';
+import { logEvent } from '../lib/logger';
+import { authenticate, setCorsHeaders, handleOptions, type AuthenticatedRequest } from '../lib/auth';
 
 export default async function handler(
     req: VercelRequest,

@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { connectDB } from '../../lib/mongodb';
-import { Student, Project, LocationStats, Feedback, Patronage } from '../../models/index';
-import { getProjectReviewModel } from '../../models/ProjectReview';
-import { validateLogin } from '../../lib/validators';
-import { logEvent } from '../../lib/logger';
-import { generateWrappedSummary } from '../../lib/wrappedController';
-import { authenticate, setCorsHeaders, handleOptions, type AuthenticatedRequest } from '../../lib/auth';
+import { connectDB } from '../lib/mongodb';
+import { Student, Project, LocationStats, Feedback, Patronage } from '../models/index';
+import { getProjectReviewModel } from '../models/ProjectReview';
+import { validateLogin } from '../lib/validators';
+import { logEvent } from '../lib/logger';
+import { generateWrappedSummary } from '../lib/wrappedController';
+import { authenticate, setCorsHeaders, handleOptions, type AuthenticatedRequest } from '../lib/auth';
 
 export default async function handler(
     req: VercelRequest,

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import connectDB from '../../lib/mongodb';
-import { getSessionModel } from '../../models/Session';
-import { encryptToken, generateSessionToken } from '../../lib/crypto';
+import connectDB from '../lib/mongodb';
+import { getSessionModel } from '../models/Session';
+import { encryptToken, generateSessionToken } from '../lib/crypto';
 
 export default async function handler(
     req: VercelRequest,
