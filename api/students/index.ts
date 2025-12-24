@@ -26,6 +26,58 @@ export default async function handler(
 
         const authReq = req as AuthenticatedRequest;
 
+        // Handle action=pools - return unique pool combinations
+        if (req.query.action === 'pools') {
+            let validatedCampusId: number | null = null;
+            try {
+                validatedCampusId = validateCampusId(req.query.campusId as string);
+            } catch (validationError) {
+                return res.status(400).json({
+                    error: 'Bad Request',
+                    message: validationError instanceof Error ? validationError.message : 'Invalid campus ID'
+                });
+            }
+
+            const filter = validatedCampusId !== null ? { campusId: validatedCampusId } : {};
+
+            const pools = await Student.aggregate([
+                { $match: filter },
+                {
+                    $match: {
+                        pool_month: { $exists: true, $ne: null },
+                        pool_year: { $exists: true, $ne: null }
+                    }
+                },
+                {
+                    $group: {
+                        _id: {
+                            month: '$pool_month',
+                            year: '$pool_year'
+                        },
+                        count: { $sum: 1 }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        month: '$_id.month',
+                        year: '$_id.year',
+                        count: 1
+                    }
+                }
+            ]);
+
+            logEvent(
+                req,
+                authReq.user?.login as string || 'unknown',
+                validatedCampusId || 0,
+                'student_pools_view',
+                { campusId: validatedCampusId, poolCount: pools.length }
+            );
+
+            return res.json({ pools });
+        }
+
         // Validate inputs
         let validatedCampusId: number | null, validatedSearch: string, validatedPool: { month: string; year: string } | null, validatedStatus: string | null;
         let validatedSort: string, validatedOrder: 'asc' | 'desc', validatedLimit: number, validatedPage: number;

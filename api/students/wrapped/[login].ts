@@ -85,7 +85,7 @@ export default async function handler(
                 {
                     evaluator: validatedLogin,
                     date: { $gte: year2025Start, $lte: year2025End },
-                    comment: { $exists: true, $ne: null, $ne: '' }
+                    comment: { $exists: true, $nin: [null, ''] }
                 },
                 { comment: 1, _id: 0 }
             ).lean(),
@@ -94,7 +94,7 @@ export default async function handler(
                 {
                     evaluated: validatedLogin,
                     date: { $gte: year2025Start, $lte: year2025End },
-                    comment: { $exists: true, $ne: null, $ne: '' }
+                    comment: { $exists: true, $nin: [null, ''] }
                 },
                 { comment: 1, _id: 0 }
             ).lean()

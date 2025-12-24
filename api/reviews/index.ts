@@ -51,6 +51,19 @@ export default async function handler(
 
         const ProjectReview = getProjectReviewModel();
 
+        // Handle action=statuses - return unique statuses
+        if (req.query.action === 'statuses') {
+            const statuses = await ProjectReview.distinct('status');
+            const validStatuses = statuses.filter((s: unknown) => s !== null && s !== undefined);
+            return res.json({ statuses: validStatuses.sort() });
+        }
+
+        // Handle action=projectNames - return unique project names
+        if (req.query.action === 'projectNames') {
+            const projectNames = await ProjectReview.distinct('project');
+            return res.json({ projectNames: projectNames.sort() });
+        }
+
         // Validate campusId
         let validatedCampusId: number | null = null;
         try {

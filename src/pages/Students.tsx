@@ -57,7 +57,7 @@ function Students() {
   const { user, logout, token } = useAuth();
   const { getStudentsCache, setStudentsCache, getStudentsFilters, setStudentsFilters } = useCache();
   const navigate = useNavigate();
-  
+
   // Cache'den filter state'ini yükle - useState lazy initialization ile
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,13 +105,13 @@ function Students() {
       if (cached.page) setPagination(prev => ({ ...prev, page: cached.page || 1 }));
     }
     setIsInitialized(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchPools = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
-      const response = await axios.get(`${apiUrl}/api/students/pools`, {
+      const response = await axios.get(`${apiUrl}/api/students?action=pools`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPools(response.data.pools);
@@ -128,13 +128,13 @@ function Students() {
   useEffect(() => {
     if (!token) return;
     fetchPools();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // Filtreleri cache'e kaydet
   useEffect(() => {
     if (!isInitialized) return;
-    
+
     setStudentsFilters({
       search,
       status,
@@ -145,7 +145,7 @@ function Students() {
       order,
       page: pagination.page
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, status, campusId, poolMonth, poolYear, sortBy, order, pagination.page, isInitialized]);
 
   // Students verisini yükle
@@ -154,7 +154,7 @@ function Students() {
 
     const cacheKey = `${campusId}-${status}-${poolMonth}-${poolYear}-${sortBy}-${order}-${search}-${pagination.page}`;
     const cachedData = getStudentsCache(cacheKey);
-    
+
     if (cachedData) {
       const cached = cachedData as { students: Student[]; pagination: PaginationInfo };
       setStudents(cached.students);
@@ -210,7 +210,7 @@ function Students() {
     };
 
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isInitialized, campusId, status, poolMonth, poolYear, sortBy, order, pagination.page, searchTrigger]);
 
   // Scroll pozisyonunu restore et
@@ -249,28 +249,28 @@ function Students() {
   const getStatusBadge = (student: Student) => {
     // Staff kontrolü en önce
     if (student['staff?']) return <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold">👨‍💻 Staff</span>;
-    
+
     // Blackholed kontrolü
     if (student.blackholed) return <span className="px-2 py-1 bg-black text-white rounded-full text-xs font-semibold">🕳️ Blackholed</span>;
-    
+
     // Sinker kontrolü
     if (student.sinker) return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">⚓ Sinker</span>;
-    
+
     // Freeze kontrolü
     if (student.freeze) return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">❄️ Freeze</span>;
-    
+
     // Inactive kontrolü (grade ve alumni/active'den önce)
     if (!student['active?'] && !student['alumni?']) return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">⭕ Inactive</span>;
-    
+
     // Grade bazlı badge göster
     if (student.grade === 'Transcender') return <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">🚀 Transcender</span>;
     if (student.grade === 'Cadet') return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">👨‍🚀 Cadet</span>;
     if (student.grade === 'Piscine') return <span className="px-2 py-1 bg-cyan-100 text-cyan-700 rounded-full text-xs font-semibold">🏊 Piscine</span>;
-    
+
     // Alumni ve Active en sonda
     if (student['alumni?']) return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">🎓 Alumni</span>;
     if (student['active?']) return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">✅ Active</span>;
-    
+
     return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">⭕ Inactive</span>;
   };
 
@@ -450,7 +450,7 @@ function Students() {
                     />
 
                     <div className="flex-1 min-w-0">
-                      <Link 
+                      <Link
                         to={`/students/${student.login}`}
                         className="font-semibold text-(--text-primary) truncate hover:text-(--primary) transition text-sm sm:text-base block"
                         onClick={(e) => e.stopPropagation()}

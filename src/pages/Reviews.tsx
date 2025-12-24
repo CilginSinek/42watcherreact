@@ -55,7 +55,7 @@ function Reviews() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
+
   // Filters
   const [projectName, setProjectName] = useState('');
   const [campusId, setCampusId] = useState('');
@@ -66,7 +66,7 @@ function Reviews() {
   const [dateFilter, setDateFilter] = useState<'after' | 'before' | 'between'>('after');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  
+
   const [statuses, setStatuses] = useState<string[]>([]);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -110,7 +110,7 @@ function Reviews() {
       if (cached.page) setPagination(prev => ({ ...prev, page: cached.page || 1 }));
     }
     setIsInitialized(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getCacheKey = () => {
@@ -121,10 +121,10 @@ function Reviews() {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
       const [statusesRes, projectsRes] = await Promise.all([
-        axios.get(`${apiUrl}/api/reviews/statuses`, {
+        axios.get(`${apiUrl}/api/reviews?action=statuses`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${apiUrl}/api/reviews/projectNames`, {
+        axios.get(`${apiUrl}/api/reviews?action=projectNames`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       ]);
@@ -164,7 +164,7 @@ function Reviews() {
       const response = await axios.get(`${apiUrl}/api/reviews?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       setReviews(response.data.reviews || []);
       setPagination(prev => ({
         ...prev,
@@ -187,13 +187,13 @@ function Reviews() {
   useEffect(() => {
     if (!token) return;
     fetchMetadata();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // Filtreleri cache'e kaydet
   useEffect(() => {
     if (!isInitialized) return;
-    
+
     setReviewsFilters({
       search,
       projectName,
@@ -207,15 +207,15 @@ function Reviews() {
       dateTo,
       page: pagination.page
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, projectName, campusId, evaluatorLogin, evaluatedLogin, score, status, dateFilter, dateFrom, dateTo, pagination.page, isInitialized]);
 
   useEffect(() => {
     if (!token || !isInitialized) return;
-    
+
     const cacheKey = getCacheKey();
     const cachedData = getReviewsCache(cacheKey);
-    
+
     if (cachedData) {
       const cached = cachedData as { reviews: Review[]; pagination: PaginationInfo };
       setReviews(cached.reviews || []);
@@ -228,7 +228,7 @@ function Reviews() {
     } else {
       fetchReviews();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isInitialized, projectName, campusId, score, status, dateFilter, dateFrom, dateTo, pagination.page, searchTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -253,9 +253,9 @@ function Reviews() {
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -308,7 +308,7 @@ function Reviews() {
       <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         <div className="card space-y-4 mb-8">
           <h2 className="text-xl font-bold text-(--text-primary) mb-4">🔍 Search Reviews</h2>
-          
+
           <form onSubmit={handleSearch} className="space-y-4">
             {/* General Search */}
             <div className="flex gap-3 flex-col sm:flex-row">
@@ -344,7 +344,7 @@ function Reviews() {
                   ))}
                 </datalist>
               </div>
-              
+
               <input
                 type="text"
                 placeholder="Evaluator Login"
@@ -352,7 +352,7 @@ function Reviews() {
                 onChange={(e) => setEvaluatorLogin(e.target.value)}
                 className="input py-2 text-sm"
               />
-              
+
               <input
                 type="text"
                 placeholder="Evaluated Login (Project Owner)"
@@ -416,7 +416,7 @@ function Reviews() {
                   className="input py-2 text-sm w-full"
                 />
               </div>
-              
+
               {dateFilter === 'between' && (
                 <div>
                   <label className="block text-sm text-(--text-tertiary) mb-1">To Date</label>
@@ -460,7 +460,7 @@ function Reviews() {
                           {formatDate(review.date)}
                         </p>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 flex-wrap">
                         {review.status && (
                           <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
@@ -479,13 +479,13 @@ function Reviews() {
                       <div className="flex items-center gap-3">
                         <div className="text-xs text-(--text-tertiary)">Evaluator:</div>
                         {review.evaluatorData ? (
-                          <Link 
+                          <Link
                             to={`/students/${review.evaluatorData.login}`}
                             className="flex items-center gap-2 hover:opacity-80 transition"
                           >
                             {review.evaluatorData.image && (
-                              <img 
-                                src={review.evaluatorData.image.versions.small} 
+                              <img
+                                src={review.evaluatorData.image.versions.small}
                                 alt={review.evaluatorData.login}
                                 className="w-8 h-8 rounded-full object-cover"
                               />
@@ -508,13 +508,13 @@ function Reviews() {
                       <div className="flex items-center gap-3">
                         <div className="text-xs text-(--text-tertiary)">Project Owner:</div>
                         {review.evaluatedData ? (
-                          <Link 
+                          <Link
                             to={`/students/${review.evaluatedData.login}`}
                             className="flex items-center gap-2 hover:opacity-80 transition"
                           >
                             {review.evaluatedData.image && (
-                              <img 
-                                src={review.evaluatedData.image.versions.small} 
+                              <img
+                                src={review.evaluatedData.image.versions.small}
                                 alt={review.evaluatedData.login}
                                 className="w-8 h-8 rounded-full object-cover"
                               />
