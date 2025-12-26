@@ -7,7 +7,7 @@ const MONGODB_URL2 = process.env.MONGODB_URL2 || '';
 
 interface CachedConnection { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null; }
 interface CachedDB2 { conn: mongoose.Connection | null; }
-let cached: CachedConnection = { conn: null, promise: null };
+const cached: CachedConnection = { conn: null, promise: null };
 const cachedDB2: CachedDB2 = { conn: null };
 
 async function connectDB1(): Promise<typeof mongoose> {
@@ -105,7 +105,7 @@ function validateStatus(status: string | undefined): string | null {
     return status;
 }
 function validateSort(sort: string | undefined): string {
-    const allowed = ['login', 'level', 'wallet', 'correction_point', 'project_count', 'cheat_count', 'godfather_count', 'children_count', 'feedback_count', 'avg_rating'];
+    const allowed = ['login', 'level', 'wallet', 'correction_point', 'project_count', 'cheat_count', 'cheat_date', 'godfather_count', 'children_count', 'log_time', 'feedback_count', 'avg_rating'];
     return (!sort || !allowed.includes(sort)) ? 'login' : sort;
 }
 function validateOrder(order: string | undefined): 'asc' | 'desc' { return (order === 'asc' || order === 'desc') ? order : 'asc'; }
@@ -201,6 +201,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 { $addFields: { project_count: { $size: '$projects' }, has_cheats: { $gt: [{ $size: '$cheatProjects' }, 0] } } },
                 { $project: { projects: 0, cheatProjects: 0 } },
                 { $sort: { project_count: sortOrder } },
+                { $skip: skip }, { $limit: validatedLimit }
+            ];
+            countPipeline = [{ $match: matchStage }, { $count: 'total' }];
+        } else if (validatedSort === 'cheat_count') {
+            pipeline = [
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }], as: 'cheatProjects' } },
+                { $addFields: { cheat_count: { $size: '$cheatProjects' } } },
+                { $match: { ...matchStage, cheat_count: { $gt: 0 } } },
+                { $addFields: { has_cheats: true } },
+                { $project: { cheatProjects: 0 } },
+                { $sort: { cheat_count: sortOrder } },
+                { $skip: skip }, { $limit: validatedLimit }
+            ];
+            countPipeline = [
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }], as: 'cheatProjects' } },
+                { $addFields: { cheat_count: { $size: '$cheatProjects' } } },
+                { $match: { ...matchStage, cheat_count: { $gt: 0 } } },
+                { $count: 'total' }
+            ];
+        } else if (validatedSort === 'cheat_date') {
+            pipeline = [
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }, { $addFields: { effectiveDate: { $ifNull: ['$penaltyDate', '$date'] } } }, { $sort: { effectiveDate: -1 } }, { $limit: 1 }], as: 'cheatProjects' } },
+                { $addFields: { cheat_date: { $arrayElemAt: ['$cheatProjects.effectiveDate', 0] }, has_cheats: { $gt: [{ $size: '$cheatProjects' }, 0] } } },
+                { $match: { ...matchStage, cheat_date: { $ne: null } } },
+                { $project: { cheatProjects: 0 } },
+                { $sort: { cheat_date: sortOrder } },
+                { $skip: skip }, { $limit: validatedLimit }
+            ];
+            countPipeline = [
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }, { $addFields: { effectiveDate: { $ifNull: ['$penaltyDate', '$date'] } } }], as: 'cheatProjects' } },
+                { $addFields: { cheat_date: { $arrayElemAt: ['$cheatProjects.effectiveDate', 0] } } },
+                { $match: { ...matchStage, cheat_date: { $ne: null } } },
+                { $count: 'total' }
+            ];
+        } else if (validatedSort === 'godfather_count' || validatedSort === 'children_count') {
+            pipeline = [
+                { $match: matchStage },
+                { $lookup: { from: 'patronages', localField: 'login', foreignField: 'login', as: 'patronage' } },
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }, { $limit: 1 }], as: 'cheatProjects' } },
+                { $addFields: { godfather_count: { $size: { $ifNull: [{ $arrayElemAt: ['$patronage.godfathers', 0] }, []] } }, children_count: { $size: { $ifNull: [{ $arrayElemAt: ['$patronage.children', 0] }, []] } }, has_cheats: { $gt: [{ $size: '$cheatProjects' }, 0] } } },
+                { $project: { patronage: 0, cheatProjects: 0 } },
+                { $sort: { [validatedSort]: sortOrder } },
+                { $skip: skip }, { $limit: validatedLimit }
+            ];
+            countPipeline = [{ $match: matchStage }, { $count: 'total' }];
+        } else if (validatedSort === 'log_time') {
+            pipeline = [
+                { $match: matchStage },
+                { $lookup: { from: 'locationstats', localField: 'login', foreignField: 'login', as: 'locationData' } },
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }, { $limit: 1 }], as: 'cheatProjects' } },
+                { $addFields: { log_time: { $reduce: { input: { $objectToArray: { $ifNull: [{ $arrayElemAt: ['$locationData.months', 0] }, {}] } }, initialValue: 0, in: { $add: ['$$value', { $reduce: { input: { $objectToArray: { $ifNull: ['$$this.v.days', {}] } }, initialValue: 0, in: { $let: { vars: { parts: { $split: ['$$this.v', ':'] }, hours: { $toInt: { $arrayElemAt: [{ $split: ['$$this.v', ':'] }, 0] } }, minutes: { $toInt: { $arrayElemAt: [{ $split: ['$$this.v', ':'] }, 1] } }, seconds: { $toInt: { $arrayElemAt: [{ $split: ['$$this.v', ':'] }, 2] } } }, in: { $add: ['$$value', { $multiply: ['$$hours', 3600] }, { $multiply: ['$$minutes', 60] }, '$$seconds'] } } } } }] } } }, has_cheats: { $gt: [{ $size: '$cheatProjects' }, 0] } } },
+                { $project: { locationData: 0, cheatProjects: 0 } },
+                { $sort: { log_time: sortOrder } },
+                { $skip: skip }, { $limit: validatedLimit }
+            ];
+            countPipeline = [{ $match: matchStage }, { $count: 'total' }];
+        } else if (validatedSort === 'feedback_count') {
+            pipeline = [
+                { $match: matchStage },
+                { $lookup: { from: 'feedbacks', localField: 'login', foreignField: 'evaluated', as: 'feedbacks' } },
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }, { $limit: 1 }], as: 'cheatProjects' } },
+                { $addFields: { feedback_count: { $size: '$feedbacks' }, has_cheats: { $gt: [{ $size: '$cheatProjects' }, 0] } } },
+                { $project: { feedbacks: 0, cheatProjects: 0 } },
+                { $sort: { feedback_count: sortOrder } },
+                { $skip: skip }, { $limit: validatedLimit }
+            ];
+            countPipeline = [{ $match: matchStage }, { $count: 'total' }];
+        } else if (validatedSort === 'avg_rating') {
+            pipeline = [
+                { $match: matchStage },
+                { $lookup: { from: 'feedbacks', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$evaluated', '$$studentLogin'] }, { $ne: ['$rating', null] }] } } }], as: 'feedbacks' } },
+                { $lookup: { from: 'projects', let: { studentLogin: '$login' }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$login', '$$studentLogin'] }, { $eq: ['$score', -42] }] } } }, { $limit: 1 }], as: 'cheatProjects' } },
+                { $addFields: { avg_rating: { $avg: '$feedbacks.rating' }, has_cheats: { $gt: [{ $size: '$cheatProjects' }, 0] } } },
+                { $project: { feedbacks: 0, cheatProjects: 0 } },
+                { $sort: { avg_rating: sortOrder } },
                 { $skip: skip }, { $limit: validatedLimit }
             ];
             countPipeline = [{ $match: matchStage }, { $count: 'total' }];
